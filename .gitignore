@@ -48,3 +48,11 @@ buildNumber.properties
 .project
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
+
+# Secrets - DO NOT COMMIT!
+.env
+
+# Large data files
+osm-data/
+# Или конкретно файлы .pbf, если в osm-data есть что-то еще нужное
+# *.osm.pbf

@@ -1,0 +1,77 @@
+version: '3.8' # Используем актуальную версию Compose
+
+services:
+  # --- Сервис: Бэкенд (Ваше Spring Boot приложение) ---
+  backend-app:
+    build: . # Указывает собрать образ из Dockerfile в текущей директории
+    container_name: truck_backend # Имя контейнера (удобно для логов и команд)
+    restart: on-failure # Перезапускать, если контейнер завершился с ошибкой
+    ports:
+      - "8080:8080" # Маппинг порта: порт_на_вашем_ПК:порт_в_контейнере
+    environment:
+      # --- Конфигурация подключения к БД ---
+      # Используем имя сервиса 'database' как хост
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://database:5432/truckdb
+      - SPRING_DATASOURCE_USERNAME=postgres # Имя пользователя БД (см. сервис database)
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD} # Пароль БД (берется из .env файла)
+      # --- Конфигурация подключения к движку маршрутизации ---
+      # Используем имя сервиса 'routing' как хост
+      - ROUTING_ENGINE_URL=http://routing:8989
+      # --- Другие переменные окружения ---
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY} # Ключ API (берется из .env файла)
+      # - TZ=Europe/Moscow # Можно задать часовой пояс, если нужно
+    depends_on: # Зависит от других сервисов (они запустятся раньше)
+      - database
+      - routing
+    networks: # Подключаем к общей сети
+      - truck_network
+
+  # --- Сервис: База данных (PostgreSQL + PostGIS) ---
+  database:
+    image: postgis/postgis:15-3.4 # Используем официальный образ PostGIS (проверьте актуальность версии)
+    container_name: truck_db
+    restart: unless-stopped # Всегда перезапускать, если не остановлен вручную
+    environment:
+      - POSTGRES_DB=truckdb # Имя базы данных
+      - POSTGRES_USER=postgres # Имя пользователя
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD} # Пароль (берется из .env файла)
+    volumes:
+      # Именованный volume для сохранения данных БД между перезапусками
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Маппинг порта БД (5433 на вашем ПК -> 5432 в контейнере, чтобы не конфликтовать)
+      - "5433:5432"
+    networks:
+      - truck_network
+
+  # --- Сервис: Движок Маршрутизации (Пример: GraphHopper) ---
+  routing:
+    image: graphhopper/graphhopper:latest # Официальный образ GraphHopper
+    container_name: truck_routing_engine
+    restart: unless-stopped
+    environment:
+      # Настройки Java и путь к файлу OSM внутри контейнера
+      # ИСПРАВЛЕНО ИМЯ ФАЙЛА:
+      - JAVA_OPTS=-Xms512m -Xmx2048m -Dgraphhopper.datareader.file=/data/central-fed-district-latest.osm.pbf
+    ports:
+      - "8989:8989" # Стандартный порт GraphHopper
+    volumes:
+      # Монтируем локальную папку ./osm-data в папку /data внутри контейнера
+      # ВАЖНО: Создайте папку ./osm-data и положите туда ваш .osm.pbf файл!
+      - ./osm-data:/data:ro # :ro делает папку read-only для контейнера (безопаснее)
+      # Именованный volume для кэша графа GraphHopper (ускоряет перезапуски)
+      - graphhopper_graph:/graph-cache
+    networks:
+      - truck_network
+
+# --- Декларация именованных volumes ---
+# Docker сам управляет этими томами для сохранения данных
+volumes:
+  postgres_data:
+  graphhopper_graph:
+
+# --- Декларация сети ---
+# Создаем сеть, чтобы контейнеры могли общаться друг с другом по именам сервисов
+networks:
+  truck_network:
+    driver: bridge # Стандартный драйвер сети

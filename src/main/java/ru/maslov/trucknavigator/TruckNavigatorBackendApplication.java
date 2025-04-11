@@ -6,8 +6,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class TruckNavigatorBackendApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(TruckNavigatorBackendApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(TruckNavigatorBackendApplication.class, args);
+    }
 
 }
