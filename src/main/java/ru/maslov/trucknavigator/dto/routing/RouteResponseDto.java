@@ -1,0 +1,112 @@
+package ru.maslov.trucknavigator.dto.routing;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.geolatte.geom.LineString;
+import org.geolatte.geom.G2D;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * DTO для ответа с данными построенного маршрута.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class RouteResponseDto {
+
+    // Основные параметры маршрута
+    private BigDecimal distance;  // в километрах
+    private long duration;        // в минутах
+
+    // Геометрия маршрута
+    private List<double[]> coordinates = new ArrayList<>();
+    private LineString<G2D> geometry;
+
+    // Список инструкций
+    private List<Instruction> instructions = new ArrayList<>();
+
+    // Информация о рисках
+    private BigDecimal weatherRiskScore;
+    private BigDecimal roadQualityRiskScore;
+    private BigDecimal trafficRiskScore;
+    private BigDecimal overallRiskScore;
+
+    // Экономические показатели
+    private BigDecimal estimatedFuelConsumption;
+    private BigDecimal estimatedFuelCost;
+    private BigDecimal estimatedTollCost;
+    private BigDecimal estimatedDriverCost;
+    private BigDecimal estimatedTotalCost;
+
+    private List<RoadQualitySegment> roadQualitySegments = new ArrayList<>();
+    private List<WeatherAlertSegment> weatherAlertSegments = new ArrayList<>();
+    private List<TollSegment> tollSegments = new ArrayList<>();
+
+    /**
+     * Инструкция для навигации.
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Instruction {
+        private String text;
+        private BigDecimal distance;  // в километрах
+        private long time;            // в минутах
+        private String streetName;
+        private Integer exitNumber;   // для развязок
+        private Integer turnAngle;    // угол поворота в градусах
+    }
+
+    /**
+     * Сегмент с информацией о качестве дороги.
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RoadQualitySegment {
+        private int startIndex;       // индекс начальной точки в массиве координат
+        private int endIndex;         // индекс конечной точки в массиве координат
+        private BigDecimal distance;  // длина сегмента в километрах
+        private String quality;       // качество дороги: EXCELLENT, GOOD, FAIR, POOR, VERY_POOR
+        private String surfaceType;   // тип покрытия: ASPHALT, CONCRETE, GRAVEL, UNPAVED
+        private String description;   // описание состояния дороги
+        private BigDecimal riskScore; // оценка риска для этого сегмента
+    }
+
+    /**
+     * Сегмент с предупреждением о погодных условиях.
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WeatherAlertSegment {
+        private int startIndex;       // индекс начальной точки в массиве координат
+        private int endIndex;         // индекс конечной точки в массиве координат
+        private BigDecimal distance;  // длина сегмента в километрах
+        private String weatherType;   // тип погоды: RAIN, SNOW, ICE, FOG, STRONG_WIND
+        private String severity;      // уровень серьезности: LOW, MODERATE, HIGH, SEVERE
+        private String description;   // описание погодного явления
+        private BigDecimal riskScore; // оценка риска для этого сегмента
+    }
+
+    /**
+     * Сегмент с платной дорогой.
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TollSegment {
+        private int startIndex;       // индекс начальной точки в массиве координат
+        private int endIndex;         // индекс конечной точки в массиве координат
+        private BigDecimal distance;  // длина сегмента в километрах
+        private String tollName;      // название платной дороги
+        private BigDecimal cost;      // стоимость проезда
+        private String currency;      // валюта
+    }
+}
