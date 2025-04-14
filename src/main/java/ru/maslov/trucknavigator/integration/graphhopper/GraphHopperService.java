@@ -10,6 +10,7 @@ import org.geolatte.geom.G2D;
 import org.geolatte.geom.LineString;
 import org.geolatte.geom.PositionSequenceBuilders;
 import org.geolatte.geom.crs.CoordinateReferenceSystems;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.BodyInserters;
@@ -36,6 +37,9 @@ public class GraphHopperService {
     private final WebClient graphHopperWebClient;
     private final ObjectMapper objectMapper;
 
+    @Value("${graphhopper.api.key}")
+    private String apiKey;
+
     /**
      * Строит маршрут на основе запроса с учетом параметров транспортного средства и груза.
      *
@@ -51,7 +55,10 @@ public class GraphHopperService {
             log.debug("Отправка запроса в GraphHopper: {}", requestBody);
 
             String responseJson = graphHopperWebClient.post()
-                    .uri("/route")
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/route")
+                            .queryParam("key", apiKey)  // Add API key as query parameter
+                            .build())
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(BodyInserters.fromValue(requestBody))
                     .retrieve()
@@ -103,42 +110,15 @@ public class GraphHopperService {
                 .add(request.getEndLat());
         points.add(endPoint);
 
-        // Настройка профиля транспортного средства
-        String profile = determineVehicleProfile(vehicle);
-        requestBody.put("profile", profile);
-
-        // Дополнительные параметры для грузовика
-        ObjectNode customModel = objectMapper.createObjectNode();
-
-        // Настройка параметров транспортного средства
-        if ("truck".equals(profile)) {
-            ObjectNode vehicleParams = requestBody.putObject("vehicle");
-            vehicleParams.put("height", vehicle.getHeightCm() / 100.0);  // в метрах
-            vehicleParams.put("width", vehicle.getWidthCm() / 100.0);    // в метрах
-            vehicleParams.put("length", vehicle.getLengthCm() / 100.0);  // в метрах
-            vehicleParams.put("weight", (vehicle.getEmptyWeightKg() +
-                    (cargo != null ? cargo.getWeightKg() : 0)) / 1000.0); // в тоннах
-            vehicleParams.put("hazmat", cargo != null && cargo.isDangerous());
-        }
+        // Используем profile="car" вместо "truck" из-за ограничений бесплатного API
+        requestBody.put("profile", "car");
 
         // Параметры для расчета
         requestBody.put("calc_points", true);
         requestBody.put("instructions", true);
-        requestBody.put("elevation", true);
+        requestBody.put("points_encoded", false);  // Запрашиваем неэнкодированные точки для простоты
 
         return requestBody;
-    }
-
-    /**
-     * Определяет профиль транспортного средства для GraphHopper.
-     *
-     * @param vehicle транспортное средство
-     * @return строковый идентификатор профиля
-     */
-    private String determineVehicleProfile(Vehicle vehicle) {
-        // Для упрощения всегда используем профиль грузовика
-        // В реальном приложении здесь может быть логика выбора профиля в зависимости от типа ТС
-        return "truck";
     }
 
     /**
@@ -164,15 +144,35 @@ public class GraphHopperService {
             response.setDuration(path.get("time").asLong() / 60000); // конвертируем в минуты
 
             // Извлечение геометрии маршрута
+            List<double[]> coordinates = new ArrayList<>();
+
             if (path.has("points")) {
-                String encodedPolyline = path.get("points").asText();
-                List<double[]> coordinates = decodePolyline(encodedPolyline, false);
+                if (path.get("points").isObject() && path.get("points").has("coordinates")) {
+                    // Неэнкодированные точки (когда points_encoded=false)
+                    JsonNode coordsArray = path.get("points").get("coordinates");
+                    for (JsonNode coord : coordsArray) {
+                        if (coord.isArray() && coord.size() >= 2) {
+                            coordinates.add(new double[]{coord.get(0).asDouble(), coord.get(1).asDouble()});
+                        }
+                    }
+                } else if (path.get("points").isTextual()) {
+                    // Энкодированный полилайн (когда points_encoded=true)
+                    String encodedPolyline = path.get("points").asText();
+                    coordinates = decodePolyline(encodedPolyline, false);
+                }
 
                 response.setCoordinates(coordinates);
 
-                // Создание LineString для хранения в PostGIS
-                LineString<G2D> lineString = createLineString(coordinates);
-                response.setGeometry(lineString);
+                // Создаем LineString для внутреннего использования (но не для отправки клиенту)
+                if (!coordinates.isEmpty()) {
+                    try {
+                        LineString<G2D> lineString = createLineString(coordinates);
+                        response.setGeometry(lineString);
+                    } catch (Exception e) {
+                        log.warn("Не удалось создать LineString из координат: {}", e.getMessage());
+                        // Продолжаем без геометрии
+                    }
+                }
             }
 
             // Извлечение инструкций
