@@ -3,6 +3,7 @@ package ru.maslov.trucknavigator.security;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.WeakKeyException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,41 @@ public class JwtTokenProvider {
     @Value("${app.jwt.refresh-expiration-ms}")
     private long refreshExpirationMs;
 
+    private final SecretKey signingKey;
+
+    /**
+     * Инициализирует провайдер JWT-токенов.
+     * Создает безопасный ключ для подписи токенов.
+     */
+    public JwtTokenProvider(@Value("${app.jwt.secret}") String jwtSecret,
+                            @Value("${app.jwt.expiration-ms}") long jwtExpirationMs,
+                            @Value("${app.jwt.refresh-expiration-ms}") long refreshExpirationMs) {
+        this.jwtSecret = jwtSecret;
+        this.jwtExpirationMs = jwtExpirationMs;
+        this.refreshExpirationMs = refreshExpirationMs;
+
+        // Инициализируем ключ с помощью метода
+        this.signingKey = createSigningKey(jwtSecret);
+    }
+
+    /**
+     * Создает безопасный ключ для подписи JWT-токенов.
+     */
+    private SecretKey createSigningKey(String secret) {
+        try {
+            byte[] keyBytes = Decoders.BASE64.decode(secret);
+            SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+            // Тестируем ключ с HS512
+            Jwts.builder().signWith(key, SignatureAlgorithm.HS512).compact();
+            log.info("Используется настроенный JWT ключ");
+            return key;
+        } catch (WeakKeyException e) {
+            log.warn("Указанный JWT ключ недостаточно длинный для алгоритма HS512. " +
+                    "Создан новый криптографически стойкий ключ.");
+            return Keys.secretKeyFor(SignatureAlgorithm.HS512);
+        }
+    }
+
     /**
      * Генерирует JWT токен на основе аутентификации пользователя.
      *
@@ -61,7 +97,7 @@ public class JwtTokenProvider {
                 .setSubject(username)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
-                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
+                .signWith(signingKey, SignatureAlgorithm.HS512)
                 .compact();
     }
 
@@ -79,18 +115,8 @@ public class JwtTokenProvider {
                 .setSubject(username)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
-                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
+                .signWith(signingKey, SignatureAlgorithm.HS512)
                 .compact();
-    }
-
-    /**
-     * Получает ключ для подписи JWT.
-     *
-     * @return ключ для подписи
-     */
-    private SecretKey getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
-        return Keys.hmacShaKeyFor(keyBytes);
     }
 
     /**
@@ -134,7 +160,7 @@ public class JwtTokenProvider {
      */
     private Claims getAllClaimsFromToken(String token) {
         return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+                .setSigningKey(signingKey)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
@@ -177,7 +203,7 @@ public class JwtTokenProvider {
     public boolean validateToken(String token) {
         try {
             Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
+                    .setSigningKey(signingKey)
                     .build()
                     .parseClaimsJws(token);
             return true;
