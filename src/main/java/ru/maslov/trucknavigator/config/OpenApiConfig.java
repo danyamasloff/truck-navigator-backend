@@ -16,23 +16,25 @@ import java.util.List;
 
 /**
  * Конфигурация OpenAPI/Swagger для документации API.
+ * Добавляет поддержку JWT аутентификации в Swagger UI.
  */
 @Configuration
 public class OpenApiConfig {
 
-    @Value("${app.openapi.dev-url}")
+    @Value("${app.openapi.dev-url:http://localhost:8080}")
     private String devUrl;
 
-    @Value("${app.openapi.prod-url}")
+    @Value("${app.openapi.prod-url:https://api.truck-navigator.ru}")
     private String prodUrl;
 
     /**
-     * Настраивает и создает объект OpenAPI с информацией о API.
+     * Настраивает и создает объект OpenAPI с информацией о API и схемой безопасности JWT.
      *
      * @return объект OpenAPI
      */
     @Bean
-    public OpenAPI myOpenAPI() {
+    public OpenAPI truckNavigatorOpenAPI() {
+        // Настройка серверов API
         Server devServer = new Server();
         devServer.setUrl(devUrl);
         devServer.setDescription("Сервер разработки");
@@ -41,15 +43,18 @@ public class OpenApiConfig {
         prodServer.setUrl(prodUrl);
         prodServer.setDescription("Продакшн сервер");
 
+        // Контактная информация
         Contact contact = new Contact();
-        contact.setEmail("maslov@example.com");
-        contact.setName("Максим Маслов");
+        contact.setEmail("info@truck-navigator.ru");
+        contact.setName("Truck Navigator Team");
         contact.setUrl("https://github.com/iGh0stnat/truck-navigator-backend");
 
+        // Лицензия
         License mitLicense = new License()
                 .name("MIT License")
-                .url("https://choosealicense.com/licenses/mit/");
+                .url("https://opensource.org/licenses/MIT");
 
+        // Основная информация об API
         Info info = new Info()
                 .title("Truck Navigator API")
                 .version("1.0.0")
@@ -57,23 +62,22 @@ public class OpenApiConfig {
                 .description("API системы аналитической навигации для грузоперевозок")
                 .license(mitLicense);
 
-        return new OpenAPI()
-                .addSecurityItem(new SecurityRequirement().addList("Bearer Authentication"))
-                .components(new Components()
-                        .addSecuritySchemes("Bearer Authentication", createAPIKeyScheme()))
-                .info(info)
-                .servers(List.of(devServer, prodServer));
-    }
-
-    /**
-     * Создает схему безопасности для JWT токена.
-     *
-     * @return схема безопасности
-     */
-    private SecurityScheme createAPIKeyScheme() {
-        return new SecurityScheme()
+        // Настройка JWT авторизации
+        SecurityScheme jwtScheme = new SecurityScheme()
+                .name("bearerAuth")
+                .description("JWT авторизация. Введите токен в формате: Bearer {token}")
                 .type(SecurityScheme.Type.HTTP)
-                .bearerFormat("JWT")
-                .scheme("bearer");
+                .scheme("bearer")
+                .bearerFormat("JWT");
+
+        // Глобальное требование безопасности (применится ко всем операциям)
+        SecurityRequirement securityRequirement = new SecurityRequirement().addList("bearerAuth");
+
+        // Создание и настройка объекта OpenAPI
+        return new OpenAPI()
+                .info(info)
+                .servers(List.of(devServer, prodServer))
+                .components(new Components().addSecuritySchemes("bearerAuth", jwtScheme))
+                .addSecurityItem(securityRequirement);
     }
 }
