@@ -1,24 +1,23 @@
 version: '3.8' # Используем актуальную версию Compose
 
 services:
-  # --- Сервис: Бэкенд (Ваше Spring Boot приложение) ---
-  backend-app:
-    build: .
-    container_name: truck_backend
-    restart: on-failure
-    ports:
-      - "8080:8080"
-    environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://database:5432/truckdb
-      - SPRING_DATASOURCE_USERNAME=postgres # Имя пользователя БД (ОК, если пароль в .env для 'postgres')
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD} # Пароль БД (берется из .env файла)
-      - ROUTING_ENGINE_URL=http://routing:8989
-      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY} # Ключ API (берется из .env файла)
-    depends_on:
-      - database
-      - routing
-    networks: # Подключаем к общей сети
-      - truck_network
+  # --- Сервис: Бэкенд (Spring Boot приложение) ---
+#  backend-app:
+#    build: .
+#    container_name: truck_backend
+#    restart: on-failure
+#    ports:
+#      - "8080:8080"
+#    environment:
+#      - SPRING_DATASOURCE_URL=jdbc:postgresql://database:5432/truckdb
+#      - SPRING_DATASOURCE_USERNAME=postgres
+#      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+#      - GRAPHHOPPER_API_KEY=${GRAPHHOPPER_API_KEY}
+#      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+#    depends_on:
+#      - database
+#    networks:
+#      - truck_network
 
   # --- Сервис: База данных (PostgreSQL + PostGIS) ---
   database:
@@ -26,9 +25,9 @@ services:
     container_name: truck_db
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=truckdb # Имя базы данных
-      - POSTGRES_USER=postgres # Имя пользователя (ОК, если пароль в .env для 'postgres')
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD} # Пароль (берется из .env файла)
+      - POSTGRES_DB=truckdb
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -36,29 +35,11 @@ services:
     networks:
       - truck_network
 
-  # --- Сервис: Движок Маршрутизации (Официальный GraphHopper) ---
-  routing:
-    image: graphhopper/graphhopper:8.0 # Используем официальный образ
-    container_name: truck_routing_engine
-    restart: unless-stopped
-    environment:
-      # Задаем все параметры через JAVA_OPTS
-      - JAVA_OPTS=-Xms512m -Xmx2048m -Dgraphhopper.datareader.file=/data/central-fed-district-latest.osm.pbf -Dgraphhopper.graph.location=/graph-cache -Dgraphhopper.graph.vehicles=truck
-    ports:
-      - "8989:8989"
-    volumes:
-      # Оставляем /data с правом на запись
-      - ./osm-data:/data
-      - graphhopper_graph:/graph-cache
-    networks:
-      - truck_network
-
 # --- Декларация именованных volumes ---
 volumes:
   postgres_data:
-  graphhopper_graph:
 
-# --- Декларация сети ---  <-- ДОБАВЛЕН ЭТОТ БЛОК
+# --- Декларация сети ---
 networks:
   truck_network:
     driver: bridge # Стандартный тип сети для Docker Compose
