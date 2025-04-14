@@ -1,5 +1,6 @@
 package ru.maslov.trucknavigator.dto.routing;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,6 +27,9 @@ public class RouteResponseDto {
 
     // Геометрия маршрута
     private List<double[]> coordinates = new ArrayList<>();
+
+    // Используем JsonIgnore, чтобы исключить поле из сериализации JSON
+    @JsonIgnore
     private LineString<G2D> geometry;
 
     // Список инструкций
@@ -48,6 +52,10 @@ public class RouteResponseDto {
     private List<WeatherAlertSegment> weatherAlertSegments = new ArrayList<>();
     private List<TollSegment> tollSegments = new ArrayList<>();
 
+    //Комплаенс-Ассистент РТО
+    private boolean rtoCompliant;
+    private List<String> rtoWarnings = new ArrayList<>();
+
     /**
      * Инструкция для навигации.
      */
@@ -63,9 +71,7 @@ public class RouteResponseDto {
         private Integer turnAngle;    // угол поворота в градусах
     }
 
-    /**
-     * Сегмент с информацией о качестве дороги.
-     */
+    // Остальные внутренние классы не меняются
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -79,9 +85,6 @@ public class RouteResponseDto {
         private BigDecimal riskScore; // оценка риска для этого сегмента
     }
 
-    /**
-     * Сегмент с предупреждением о погодных условиях.
-     */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -95,9 +98,6 @@ public class RouteResponseDto {
         private BigDecimal riskScore; // оценка риска для этого сегмента
     }
 
-    /**
-     * Сегмент с платной дорогой.
-     */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
