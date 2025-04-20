@@ -9,7 +9,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import ru.maslov.trucknavigator.dto.driver.DriverDetailDto;
 import ru.maslov.trucknavigator.dto.driver.DriverRestAnalysisDto;
+import ru.maslov.trucknavigator.dto.driver.DriverSummaryDto;
 import ru.maslov.trucknavigator.dto.routing.RouteResponseDto;
 import ru.maslov.trucknavigator.entity.Driver;
 import ru.maslov.trucknavigator.service.DriverRestTimeService;
@@ -36,41 +38,39 @@ public class DriverController {
     /**
      * Получение списка всех водителей.
      *
-     * @return список водителей
+     * @return список водителей в формате DTO
      */
     @GetMapping
     @Operation(summary = "Получить всех водителей", description = "Возвращает список всех водителей")
-    public ResponseEntity<List<Driver>> getAllDrivers() {
-        return ResponseEntity.ok(driverService.findAll());
+    public ResponseEntity<List<DriverSummaryDto>> getAllDrivers() {
+        return ResponseEntity.ok(driverService.findAllSummaries());
     }
 
     /**
      * Получение водителя по ID.
      *
      * @param id идентификатор водителя
-     * @return водитель
+     * @return водитель в формате детального DTO
      */
     @GetMapping("/{id}")
     @Operation(summary = "Получить водителя по ID", description = "Возвращает водителя по указанному идентификатору")
-    public ResponseEntity<Driver> getDriverById(
+    public ResponseEntity<DriverDetailDto> getDriverById(
             @Parameter(description = "Идентификатор водителя") @PathVariable Long id) {
-        return driverService.findById(id)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        return ResponseEntity.ok(driverService.findDetailById(id));
     }
 
     /**
      * Создание нового водителя.
      *
      * @param driver данные нового водителя
-     * @return созданный водитель
+     * @return созданный водитель в формате детального DTO
      */
     @PostMapping
     @Operation(summary = "Создать водителя", description = "Создает нового водителя на основе переданных данных")
-    public ResponseEntity<Driver> createDriver(
+    public ResponseEntity<DriverDetailDto> createDriver(
             @Parameter(description = "Данные водителя")
             @Valid @RequestBody Driver driver) {
-        return ResponseEntity.ok(driverService.save(driver));
+        return ResponseEntity.ok(driverService.saveAndGetDto(driver));
     }
 
     /**
@@ -78,11 +78,11 @@ public class DriverController {
      *
      * @param id идентификатор водителя
      * @param driver обновленные данные водителя
-     * @return обновленный водитель
+     * @return обновленный водитель в формате детального DTO
      */
     @PutMapping("/{id}")
     @Operation(summary = "Обновить водителя", description = "Обновляет существующего водителя")
-    public ResponseEntity<Driver> updateDriver(
+    public ResponseEntity<DriverDetailDto> updateDriver(
             @Parameter(description = "Идентификатор водителя") @PathVariable Long id,
             @Parameter(description = "Обновленные данные водителя")
             @Valid @RequestBody Driver driver) {
@@ -92,7 +92,7 @@ public class DriverController {
         }
 
         driver.setId(id);
-        return ResponseEntity.ok(driverService.save(driver));
+        return ResponseEntity.ok(driverService.saveAndGetDto(driver));
     }
 
     /**
@@ -105,10 +105,6 @@ public class DriverController {
     @Operation(summary = "Удалить водителя", description = "Удаляет водителя по указанному идентификатору")
     public ResponseEntity<Void> deleteDriver(
             @Parameter(description = "Идентификатор водителя") @PathVariable Long id) {
-
-        if (!driverService.existsById(id)) {
-            return ResponseEntity.notFound().build();
-        }
 
         driverService.deleteById(id);
         return ResponseEntity.noContent().build();
@@ -146,12 +142,12 @@ public class DriverController {
      * @param driverId идентификатор водителя
      * @param status новый статус водителя
      * @param timestamp время изменения статуса
-     * @return обновленный водитель
+     * @return обновленный водитель в формате детального DTO
      */
     @PutMapping("/{driverId}/status")
     @Operation(summary = "Обновить статус водителя",
             description = "Обновляет статус водителя в системе контроля РТО")
-    public ResponseEntity<Driver> updateDriverStatus(
+    public ResponseEntity<DriverDetailDto> updateDriverStatus(
             @Parameter(description = "Идентификатор водителя") @PathVariable Long driverId,
             @Parameter(description = "Новый статус (DRIVING, REST_BREAK, DAILY_REST и т.д.)")
             @RequestParam Driver.DrivingStatus status,
@@ -166,6 +162,6 @@ public class DriverController {
         driver = driverRestTimeService.updateDriverStatus(driver, status, timestamp);
         driver = driverService.save(driver);
 
-        return ResponseEntity.ok(driver);
+        return ResponseEntity.ok(driverService.findDetailById(driver.getId()));
     }
 }

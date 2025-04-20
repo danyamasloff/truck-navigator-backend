@@ -11,9 +11,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.maslov.trucknavigator.dto.compliance.ComplianceResultDto;
+import ru.maslov.trucknavigator.dto.geocoding.GeoLocationDto;
 import ru.maslov.trucknavigator.dto.geocoding.GeoPoint;
-import ru.maslov.trucknavigator.dto.routing.RouteRequestDto;
-import ru.maslov.trucknavigator.dto.routing.RouteResponseDto;
+import ru.maslov.trucknavigator.dto.routing.*;
 import ru.maslov.trucknavigator.entity.Cargo;
 import ru.maslov.trucknavigator.entity.Driver;
 import ru.maslov.trucknavigator.entity.Route;
@@ -23,6 +23,7 @@ import ru.maslov.trucknavigator.exception.RoutingException;
 import ru.maslov.trucknavigator.integration.graphhopper.GeocodingService;
 import ru.maslov.trucknavigator.integration.graphhopper.GraphHopperService;
 import ru.maslov.trucknavigator.service.*;
+import ru.maslov.trucknavigator.service.mapper.RouteMapper;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -50,31 +51,32 @@ public class RouteController {
     private final RiskAnalysisService riskAnalysisService;
     private final ProfitabilityService profitabilityService;
     private final ComplianceService complianceService;
+    private final RouteMapper routeMapper;
 
     /**
      * Получение списка всех маршрутов.
      *
-     * @return список маршрутов
+     * @return список маршрутов в виде DTO
      */
     @GetMapping
     @Operation(summary = "Получить все маршруты", description = "Возвращает список всех маршрутов")
-    public ResponseEntity<List<Route>> getAllRoutes() {
-        return ResponseEntity.ok(routeService.findAll());
+    public ResponseEntity<List<RouteSummaryDto>> getAllRoutes() {
+        // Используем метод сервиса, возвращающий DTO вместо сущностей
+        return ResponseEntity.ok(routeService.findAllSummaries());
     }
 
     /**
      * Получение маршрута по ID.
      *
      * @param id идентификатор маршрута
-     * @return маршрут
+     * @return детальная информация о маршруте в виде DTO
      */
     @GetMapping("/{id}")
     @Operation(summary = "Получить маршрут по ID", description = "Возвращает маршрут по указанному идентификатору")
-    public ResponseEntity<Route> getRouteById(
+    public ResponseEntity<RouteDetailDto> getRouteById(
             @Parameter(description = "Идентификатор маршрута") @PathVariable Long id) {
-        return routeService.findById(id)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        // Используем метод, возвращающий DTO с детальной информацией
+        return ResponseEntity.ok(routeService.findDetailById(id));
     }
 
     /**
@@ -131,37 +133,32 @@ public class RouteController {
     /**
      * Создание нового маршрута.
      *
-     * @param route данные нового маршрута
-     * @return созданный маршрут
+     * @param routeDto данные нового маршрута
+     * @return созданный маршрут в виде DTO
      */
     @PostMapping
     @Operation(summary = "Создать маршрут", description = "Создает новый маршрут на основе переданных данных")
-    public ResponseEntity<Route> createRoute(
+    public ResponseEntity<RouteDetailDto> createRoute(
             @Parameter(description = "Данные маршрута")
-            @Valid @RequestBody Route route) {
-        return ResponseEntity.ok(routeService.save(route));
+            @Valid @RequestBody RouteCreateUpdateDto routeDto) {
+        return ResponseEntity.ok(routeService.createRoute(routeDto));
     }
 
     /**
      * Обновление маршрута.
      *
      * @param id идентификатор маршрута
-     * @param route обновленные данные маршрута
-     * @return обновленный маршрут
+     * @param routeDto обновленные данные маршрута
+     * @return обновленный маршрут в виде DTO
      */
     @PutMapping("/{id}")
     @Operation(summary = "Обновить маршрут", description = "Обновляет существующий маршрут")
-    public ResponseEntity<Route> updateRoute(
+    public ResponseEntity<RouteDetailDto> updateRoute(
             @Parameter(description = "Идентификатор маршрута") @PathVariable Long id,
             @Parameter(description = "Обновленные данные маршрута")
-            @Valid @RequestBody Route route) {
+            @Valid @RequestBody RouteCreateUpdateDto routeDto) {
 
-        if (!routeService.existsById(id)) {
-            return ResponseEntity.notFound().build();
-        }
-
-        route.setId(id);
-        return ResponseEntity.ok(routeService.save(route));
+        return ResponseEntity.ok(routeService.updateRoute(id, routeDto));
     }
 
     /**
@@ -174,10 +171,6 @@ public class RouteController {
     @Operation(summary = "Удалить маршрут", description = "Удаляет маршрут по указанному идентификатору")
     public ResponseEntity<Void> deleteRoute(
             @Parameter(description = "Идентификатор маршрута") @PathVariable Long id) {
-
-        if (!routeService.existsById(id)) {
-            return ResponseEntity.notFound().build();
-        }
 
         routeService.deleteById(id);
         return ResponseEntity.noContent().build();
@@ -286,6 +279,54 @@ public class RouteController {
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(createErrorResponseDto("Внутренняя ошибка сервера"));
         }
+    }
+
+    /**
+     * Поиск места для начальной или конечной точки маршрута.
+     *
+     * @param query Поисковый запрос
+     * @param placeType Тип места для более точного поиска
+     * @param lat Опорная широта (текущее местоположение)
+     * @param lon Опорная долгота (текущее местоположение)
+     * @return Список найденных мест
+     */
+    @GetMapping("/find-place")
+    @Operation(summary = "Поиск места",
+            description = "Ищет место для указания в маршруте (начальная или конечная точка)")
+    public ResponseEntity<List<GeoLocationDto>> findPlaceForRoute(
+            @Parameter(description = "Поисковый запрос")
+            @RequestParam String query,
+
+            @Parameter(description = "Тип места (fuel, warehouse, parking и т.д.)")
+            @RequestParam(required = false) String placeType,
+
+            @Parameter(description = "Текущая широта")
+            @RequestParam(required = false) Double lat,
+
+            @Parameter(description = "Текущая долгота")
+            @RequestParam(required = false) Double lon) {
+
+        String osmTag = null;
+        if (placeType != null) {
+            // Преобразование типа места в OSM-тег
+            switch (placeType) {
+                case "fuel":
+                    osmTag = "amenity:fuel";
+                    break;
+                case "food":
+                    osmTag = "amenity:restaurant";
+                    break;
+                case "parking":
+                    osmTag = "amenity:parking";
+                    break;
+                case "warehouse":
+                    osmTag = "shop:warehouse";
+                    break;
+            }
+        }
+
+        List<GeoLocationDto> places = geocodingService.searchPlaces(query, osmTag, 10, lat, lon);
+        return ResponseEntity.ok(places);
     }
 
     /**

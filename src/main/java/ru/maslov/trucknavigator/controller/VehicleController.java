@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import ru.maslov.trucknavigator.dto.vehicle.VehicleDetailDto;
+import ru.maslov.trucknavigator.dto.vehicle.VehicleSummaryDto;
 import ru.maslov.trucknavigator.entity.Vehicle;
 import ru.maslov.trucknavigator.service.VehicleService;
 
@@ -30,41 +32,39 @@ public class VehicleController {
     /**
      * Получение списка всех транспортных средств.
      *
-     * @return список ТС
+     * @return список ТС в формате DTO
      */
     @GetMapping
     @Operation(summary = "Получить все ТС", description = "Возвращает список всех транспортных средств")
-    public ResponseEntity<List<Vehicle>> getAllVehicles() {
-        return ResponseEntity.ok(vehicleService.findAll());
+    public ResponseEntity<List<VehicleSummaryDto>> getAllVehicles() {
+        return ResponseEntity.ok(vehicleService.findAllSummaries());
     }
 
     /**
      * Получение транспортного средства по ID.
      *
      * @param id идентификатор ТС
-     * @return транспортное средство
+     * @return транспортное средство в формате детального DTO
      */
     @GetMapping("/{id}")
     @Operation(summary = "Получить ТС по ID", description = "Возвращает транспортное средство по указанному идентификатору")
-    public ResponseEntity<Vehicle> getVehicleById(
+    public ResponseEntity<VehicleDetailDto> getVehicleById(
             @Parameter(description = "Идентификатор ТС") @PathVariable Long id) {
-        return vehicleService.findById(id)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        return ResponseEntity.ok(vehicleService.findDetailById(id));
     }
 
     /**
      * Создание нового транспортного средства.
      *
      * @param vehicle данные нового ТС
-     * @return созданное ТС
+     * @return созданное ТС в формате детального DTO
      */
     @PostMapping
     @Operation(summary = "Создать ТС", description = "Создает новое транспортное средство на основе переданных данных")
-    public ResponseEntity<Vehicle> createVehicle(
+    public ResponseEntity<VehicleDetailDto> createVehicle(
             @Parameter(description = "Данные ТС")
             @Valid @RequestBody Vehicle vehicle) {
-        return ResponseEntity.ok(vehicleService.save(vehicle));
+        return ResponseEntity.ok(vehicleService.saveAndGetDto(vehicle));
     }
 
     /**
@@ -72,11 +72,11 @@ public class VehicleController {
      *
      * @param id идентификатор ТС
      * @param vehicle обновленные данные ТС
-     * @return обновленное ТС
+     * @return обновленное ТС в формате детального DTO
      */
     @PutMapping("/{id}")
     @Operation(summary = "Обновить ТС", description = "Обновляет существующее транспортное средство")
-    public ResponseEntity<Vehicle> updateVehicle(
+    public ResponseEntity<VehicleDetailDto> updateVehicle(
             @Parameter(description = "Идентификатор ТС") @PathVariable Long id,
             @Parameter(description = "Обновленные данные ТС")
             @Valid @RequestBody Vehicle vehicle) {
@@ -86,7 +86,7 @@ public class VehicleController {
         }
 
         vehicle.setId(id);
-        return ResponseEntity.ok(vehicleService.save(vehicle));
+        return ResponseEntity.ok(vehicleService.saveAndGetDto(vehicle));
     }
 
     /**
@@ -100,10 +100,6 @@ public class VehicleController {
     public ResponseEntity<Void> deleteVehicle(
             @Parameter(description = "Идентификатор ТС") @PathVariable Long id) {
 
-        if (!vehicleService.existsById(id)) {
-            return ResponseEntity.notFound().build();
-        }
-
         vehicleService.deleteById(id);
         return ResponseEntity.noContent().build();
     }
@@ -113,23 +109,17 @@ public class VehicleController {
      *
      * @param id идентификатор ТС
      * @param fuelLevel новый уровень топлива в литрах
-     * @return обновленное ТС
+     * @return обновленное ТС в формате детального DTO
      */
     @PutMapping("/{id}/fuel-level")
     @Operation(summary = "Обновить уровень топлива",
             description = "Устанавливает текущий уровень топлива в транспортном средстве")
-    public ResponseEntity<Vehicle> updateFuelLevel(
+    public ResponseEntity<VehicleDetailDto> updateFuelLevel(
             @Parameter(description = "Идентификатор ТС") @PathVariable Long id,
             @Parameter(description = "Уровень топлива в литрах")
             @RequestParam BigDecimal fuelLevel) {
 
-        Vehicle vehicle = vehicleService.findById(id).orElse(null);
-        if (vehicle == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        vehicle.setCurrentFuelLevelLitres(fuelLevel);
-        return ResponseEntity.ok(vehicleService.save(vehicle));
+        return ResponseEntity.ok(vehicleService.updateFuelLevel(id, fuelLevel));
     }
 
     /**
@@ -137,22 +127,16 @@ public class VehicleController {
      *
      * @param id идентификатор ТС
      * @param odometerValue новое значение одометра в километрах
-     * @return обновленное ТС
+     * @return обновленное ТС в формате детального DTO
      */
     @PutMapping("/{id}/odometer")
     @Operation(summary = "Обновить показания одометра",
             description = "Устанавливает текущие показания одометра транспортного средства")
-    public ResponseEntity<Vehicle> updateOdometer(
+    public ResponseEntity<VehicleDetailDto> updateOdometer(
             @Parameter(description = "Идентификатор ТС") @PathVariable Long id,
             @Parameter(description = "Показания одометра в километрах")
             @RequestParam BigDecimal odometerValue) {
 
-        Vehicle vehicle = vehicleService.findById(id).orElse(null);
-        if (vehicle == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        vehicle.setCurrentOdometerKm(odometerValue);
-        return ResponseEntity.ok(vehicleService.save(vehicle));
+        return ResponseEntity.ok(vehicleService.updateOdometer(id, odometerValue));
     }
 }
