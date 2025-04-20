@@ -2,8 +2,13 @@ package ru.maslov.trucknavigator.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import ru.maslov.trucknavigator.dto.cargo.CargoDetailDto;
+import ru.maslov.trucknavigator.dto.cargo.CargoSummaryDto;
 import ru.maslov.trucknavigator.entity.Cargo;
+import ru.maslov.trucknavigator.exception.EntityNotFoundException;
 import ru.maslov.trucknavigator.repository.CargoRepository;
+import ru.maslov.trucknavigator.service.mapper.CargoMapper;
 
 import java.util.List;
 import java.util.Optional;
@@ -16,14 +21,29 @@ import java.util.Optional;
 public class CargoService {
 
     private final CargoRepository cargoRepository;
+    private final CargoMapper cargoMapper;
 
     /**
-     * Получает все грузы.
+     * Получает все грузы в виде сокращенных DTO.
      *
-     * @return список грузов
+     * @return список DTO грузов
      */
-    public List<Cargo> findAll() {
-        return cargoRepository.findAll();
+    public List<CargoSummaryDto> findAllSummaries() {
+        List<Cargo> cargos = cargoRepository.findAll();
+        return cargoMapper.toSummaryDtoList(cargos);
+    }
+
+    /**
+     * Получает груз по идентификатору в виде полного DTO.
+     *
+     * @param id идентификатор груза
+     * @return детальное DTO с информацией о грузе
+     * @throws EntityNotFoundException если груз не найден
+     */
+    public CargoDetailDto findDetailById(Long id) {
+        Cargo cargo = cargoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Cargo", id));
+        return cargoMapper.toDetailDto(cargo);
     }
 
     /**
@@ -47,6 +67,18 @@ public class CargoService {
     }
 
     /**
+     * Сохраняет груз и возвращает его детальное DTO.
+     *
+     * @param cargo груз для сохранения
+     * @return детальное DTO сохраненного груза
+     */
+    @Transactional
+    public CargoDetailDto saveAndGetDto(Cargo cargo) {
+        Cargo savedCargo = cargoRepository.save(cargo);
+        return cargoMapper.toDetailDto(savedCargo);
+    }
+
+    /**
      * Проверяет наличие груза по идентификатору.
      *
      * @param id идентификатор груза
@@ -60,8 +92,13 @@ public class CargoService {
      * Удаляет груз по идентификатору.
      *
      * @param id идентификатор груза
+     * @throws EntityNotFoundException если груз не найден
      */
+    @Transactional
     public void deleteById(Long id) {
+        if (!cargoRepository.existsById(id)) {
+            throw new EntityNotFoundException("Cargo", id);
+        }
         cargoRepository.deleteById(id);
     }
 }

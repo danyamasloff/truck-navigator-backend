@@ -2,8 +2,13 @@ package ru.maslov.trucknavigator.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import ru.maslov.trucknavigator.dto.driver.DriverDetailDto;
+import ru.maslov.trucknavigator.dto.driver.DriverSummaryDto;
 import ru.maslov.trucknavigator.entity.Driver;
+import ru.maslov.trucknavigator.exception.EntityNotFoundException;
 import ru.maslov.trucknavigator.repository.DriverRepository;
+import ru.maslov.trucknavigator.service.mapper.DriverMapper;
 
 import java.util.List;
 import java.util.Optional;
@@ -16,14 +21,29 @@ import java.util.Optional;
 public class DriverService {
 
     private final DriverRepository driverRepository;
+    private final DriverMapper driverMapper;
 
     /**
-     * Получает всех водителей.
+     * Получает всех водителей в виде сокращенных DTO.
      *
-     * @return список водителей
+     * @return список DTO водителей
      */
-    public List<Driver> findAll() {
-        return driverRepository.findAll();
+    public List<DriverSummaryDto> findAllSummaries() {
+        List<Driver> drivers = driverRepository.findAll();
+        return driverMapper.toSummaryDtoList(drivers);
+    }
+
+    /**
+     * Получает водителя по идентификатору в виде полного DTO.
+     *
+     * @param id идентификатор водителя
+     * @return детальное DTO с информацией о водителе
+     * @throws EntityNotFoundException если водитель не найден
+     */
+    public DriverDetailDto findDetailById(Long id) {
+        Driver driver = driverRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Driver", id));
+        return driverMapper.toDetailDto(driver);
     }
 
     /**
@@ -47,6 +67,18 @@ public class DriverService {
     }
 
     /**
+     * Сохраняет водителя и возвращает его детальное DTO.
+     *
+     * @param driver водитель для сохранения
+     * @return детальное DTO сохраненного водителя
+     */
+    @Transactional
+    public DriverDetailDto saveAndGetDto(Driver driver) {
+        Driver savedDriver = driverRepository.save(driver);
+        return driverMapper.toDetailDto(savedDriver);
+    }
+
+    /**
      * Проверяет наличие водителя по идентификатору.
      *
      * @param id идентификатор водителя
@@ -60,8 +92,13 @@ public class DriverService {
      * Удаляет водителя по идентификатору.
      *
      * @param id идентификатор водителя
+     * @throws EntityNotFoundException если водитель не найден
      */
+    @Transactional
     public void deleteById(Long id) {
+        if (!driverRepository.existsById(id)) {
+            throw new EntityNotFoundException("Driver", id);
+        }
         driverRepository.deleteById(id);
     }
 }
