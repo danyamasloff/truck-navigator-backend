@@ -209,6 +209,23 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Обрабатывает исключения, связанные с геокодированием.
+     */
+    @ExceptionHandler(GeocodingException.class)
+    public ResponseEntity<ErrorResponse> handleGeocodingException(GeocodingException ex, WebRequest request) {
+        log.error("Ошибка геокодирования: {}", ex.getMessage());
+
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.BAD_GATEWAY.value(),  // 502 Bad Gateway - ошибка внешнего сервиса
+                ex.getMessage(),
+                request.getDescription(false),
+                LocalDateTime.now()
+        );
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_GATEWAY);
+    }
+
+    /**
      * Класс для представления стандартного ответа об ошибке.
      */
     static class ErrorResponse {
