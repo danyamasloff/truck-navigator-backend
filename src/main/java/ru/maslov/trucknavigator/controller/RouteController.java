@@ -16,14 +16,12 @@ import ru.maslov.trucknavigator.dto.geocoding.GeoPoint;
 import ru.maslov.trucknavigator.dto.routing.*;
 import ru.maslov.trucknavigator.entity.Cargo;
 import ru.maslov.trucknavigator.entity.Driver;
-import ru.maslov.trucknavigator.entity.Route;
 import ru.maslov.trucknavigator.entity.Vehicle;
 import ru.maslov.trucknavigator.exception.GeocodingException;
 import ru.maslov.trucknavigator.exception.RoutingException;
 import ru.maslov.trucknavigator.integration.graphhopper.GeocodingService;
 import ru.maslov.trucknavigator.integration.graphhopper.GraphHopperService;
 import ru.maslov.trucknavigator.service.*;
-import ru.maslov.trucknavigator.service.mapper.RouteMapper;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -51,7 +49,6 @@ public class RouteController {
     private final RiskAnalysisService riskAnalysisService;
     private final ProfitabilityService profitabilityService;
     private final ComplianceService complianceService;
-    private final RouteMapper routeMapper;
 
     /**
      * Получение списка всех маршрутов.
