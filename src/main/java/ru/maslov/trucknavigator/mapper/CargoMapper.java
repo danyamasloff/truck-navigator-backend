@@ -1,4 +1,4 @@
-package ru.maslov.trucknavigator.service.mapper;
+package ru.maslov.trucknavigator.mapper;
 
 import org.springframework.stereotype.Component;
 import ru.maslov.trucknavigator.dto.cargo.CargoDetailDto;
