@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ru.maslov.trucknavigator.dto.routing.RouteResponseDto;
-import ru.maslov.trucknavigator.dto.weather.WeatherDataDto;
+import ru.maslov.trucknavigator.dto.weather.*;
 import ru.maslov.trucknavigator.entity.Cargo;
 import ru.maslov.trucknavigator.entity.Vehicle;
 import ru.maslov.trucknavigator.integration.openweather.WeatherService;
@@ -27,6 +27,7 @@ import java.util.Random;
 public class RiskAnalysisService {
 
     private final WeatherService weatherService;
+    private final RouteWeatherService routeWeatherService;
 
     // Весовые коэффициенты для расчета общего риска, настраиваются в конфигурации
     @Value("${risk.analysis.weather.weight:0.4}")
@@ -83,10 +84,43 @@ public class RiskAnalysisService {
         double totalWeatherRiskScore = 0;
         int segmentsCount = 0;
 
-        // Для анализа погоды разделим маршрут на сегменты
+        // Проверка возможности использования расширенного прогноза погоды
+        boolean useDetailedForecast = route.getDepartureTime() != null;
+        RouteWeatherForecastDto weatherForecast = null;
+
+        if (useDetailedForecast) {
+            try {
+                // Получаем полный прогноз погоды для маршрута с учетом времени движения
+                weatherForecast = routeWeatherService.generateRouteWeatherForecast(
+                        route, route.getDepartureTime());
+
+                // Если прогноз получен успешно, используем его данные для более точного анализа
+                if (weatherForecast != null && !weatherForecast.getPointForecasts().isEmpty()) {
+                    processDetailedWeatherForecast(route, weatherForecast, weatherAlerts);
+
+                    // Суммируем оценки рисков из всех сегментов для расчета среднего
+                    totalWeatherRiskScore = weatherAlerts.stream()
+                            .mapToDouble(segment -> segment.getRiskScore().doubleValue())
+                            .sum();
+                    segmentsCount = weatherAlerts.size();
+
+                    // Добавляем предупреждения о критичных погодных условиях
+                    addCriticalWeatherWarnings(route, weatherForecast);
+
+                    // После использования детального прогноза завершаем анализ
+                    setWeatherRiskScore(route, weatherAlerts, totalWeatherRiskScore, segmentsCount);
+                    return;
+                }
+            } catch (Exception e) {
+                log.warn("Не удалось выполнить детальный анализ погодных рисков: {}", e.getMessage());
+                // Если детальный анализ не удался, продолжаем с базовым подходом
+            }
+        }
+
+        // Базовый анализ погоды (существующий код)
         List<double[]> coordinates = route.getCoordinates();
-        int numSegments = Math.min(5, coordinates.size() / 10); // Максимум 5 сегментов или меньше в зависимости от длины маршрута
-        numSegments = Math.max(1, numSegments); // Минимум 1 сегмент
+        int numSegments = Math.min(5, coordinates.size() / 10);
+        numSegments = Math.max(1, numSegments);
 
         int pointsPerSegment = coordinates.size() / numSegments;
 
@@ -138,6 +172,105 @@ public class RiskAnalysisService {
                 }
             }
         }
+
+        // Устанавливаем результат анализа
+        setWeatherRiskScore(route, weatherAlerts, totalWeatherRiskScore, segmentsCount);
+    }
+
+    /**
+     * Обрабатывает детальный прогноз погоды и создает сегменты с предупреждениями
+     */
+    private void processDetailedWeatherForecast(
+            RouteResponseDto route,
+            RouteWeatherForecastDto weatherForecast,
+            List<RouteResponseDto.WeatherAlertSegment> weatherAlerts) {
+
+        List<double[]> coordinates = route.getCoordinates();
+
+        // Обработка прогнозов по точкам
+        for (RoutePointWeatherDto pointForecast : weatherForecast.getPointForecasts()) {
+            WeatherDataDto weatherData = pointForecast.getWeatherData();
+
+            // Пропускаем точки без опасных погодных условий
+            if (weatherData.getRiskScore() == null || weatherData.getRiskScore() <= 20) {
+                continue;
+            }
+
+            // Определяем индексы сегмента (перед и после точки)
+            int pointIndex = pointForecast.getPointIndex();
+            int startIndex = Math.max(0, pointIndex - 10);
+            int endIndex = Math.min(coordinates.size() - 1, pointIndex + 10);
+
+            // Создаем погодный сегмент
+            RouteResponseDto.WeatherAlertSegment alert = new RouteResponseDto.WeatherAlertSegment();
+            alert.setStartIndex(startIndex);
+            alert.setEndIndex(endIndex);
+
+            // Устанавливаем дистанцию
+            alert.setDistance(BigDecimal.valueOf(pointForecast.getDistanceFromStart()));
+
+            // Устанавливаем тип погодного явления
+            alert.setWeatherType(weatherData.getWeatherMain() != null ?
+                    weatherData.getWeatherMain().toUpperCase() : "UNKNOWN");
+
+            // Устанавливаем уровень опасности и описание
+            alert.setSeverity(weatherData.getRiskLevel());
+            alert.setDescription(weatherData.getRiskDescription() +
+                    String.format(" (Прогноз на %s)",
+                            pointForecast.getEstimatedTime().toLocalTime()));
+            alert.setRiskScore(BigDecimal.valueOf(weatherData.getRiskScore()));
+
+            weatherAlerts.add(alert);
+        }
+    }
+
+    /**
+     * Добавляет критические погодные предупреждения из прогноза в маршрут
+     */
+    private void addCriticalWeatherWarnings(RouteResponseDto route, RouteWeatherForecastDto weatherForecast) {
+        if (weatherForecast.getHazardWarnings() == null || weatherForecast.getHazardWarnings().isEmpty()) {
+            return;
+        }
+
+        // Фильтруем только критичные предупреждения (HIGH и SEVERE)
+        List<WeatherHazardWarningDto> criticalWarnings = weatherForecast.getHazardWarnings()
+                .stream()
+                .filter(warning ->
+                        warning.getSeverity() == HazardSeverity.HIGH ||
+                                warning.getSeverity() == HazardSeverity.SEVERE)
+                .toList();
+
+        if (criticalWarnings.isEmpty()) {
+            return;
+        }
+
+        // Добавляем информацию о критичных погодных условиях в список предупреждений маршрута
+        List<String> routeWarnings = route.getRtoWarnings();
+        if (routeWarnings == null) {
+            routeWarnings = new ArrayList<>();
+            route.setRtoWarnings(routeWarnings);
+        }
+
+        for (WeatherHazardWarningDto warning : criticalWarnings) {
+            String formattedTime = warning.getExpectedTime().toLocalTime().toString();
+            String warningText = String.format("[%s] %s - %s. %s",
+                    formattedTime,
+                    warning.getHazardType().toString(),
+                    warning.getDescription(),
+                    warning.getRecommendation());
+
+            routeWarnings.add(warningText);
+        }
+    }
+
+    /**
+     * Устанавливает оценку погодного риска для маршрута
+     */
+    private void setWeatherRiskScore(
+            RouteResponseDto route,
+            List<RouteResponseDto.WeatherAlertSegment> weatherAlerts,
+            double totalWeatherRiskScore,
+            int segmentsCount) {
 
         // Устанавливаем результаты анализа в маршрут
         route.setWeatherAlertSegments(weatherAlerts);

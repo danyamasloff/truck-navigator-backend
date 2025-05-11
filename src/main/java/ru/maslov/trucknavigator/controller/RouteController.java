@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +15,8 @@ import ru.maslov.trucknavigator.dto.compliance.ComplianceResultDto;
 import ru.maslov.trucknavigator.dto.geocoding.GeoLocationDto;
 import ru.maslov.trucknavigator.dto.geocoding.GeoPoint;
 import ru.maslov.trucknavigator.dto.routing.*;
+import ru.maslov.trucknavigator.dto.weather.RouteWeatherForecastDto;
+import ru.maslov.trucknavigator.dto.weather.WeatherHazardWarningDto;
 import ru.maslov.trucknavigator.entity.Cargo;
 import ru.maslov.trucknavigator.entity.Driver;
 import ru.maslov.trucknavigator.entity.Vehicle;
@@ -24,6 +27,7 @@ import ru.maslov.trucknavigator.integration.graphhopper.GraphHopperService;
 import ru.maslov.trucknavigator.service.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,6 +53,7 @@ public class RouteController {
     private final RiskAnalysisService riskAnalysisService;
     private final ProfitabilityService profitabilityService;
     private final ComplianceService complianceService;
+    private final RouteWeatherService routeWeatherService;
 
     /**
      * Получение списка всех маршрутов.
@@ -111,7 +116,15 @@ public class RouteController {
         // Выполняем расчет маршрута через GraphHopper
         RouteResponseDto calculatedRoute = graphHopperService.calculateRoute(request, vehicle, cargo);
 
-        // Анализируем риски маршрута
+        // Устанавливаем время отправления
+        if (request.getDepartureTime() != null) {
+            calculatedRoute.setDepartureTime(request.getDepartureTime());
+        } else {
+            // Если время отправления не указано, используем текущее время + 1 час
+            calculatedRoute.setDepartureTime(LocalDateTime.now().plusHours(1));
+        }
+
+        // Анализируем риски маршрута (включая погодные риски)
         calculatedRoute = riskAnalysisService.analyzeRouteRisks(calculatedRoute, vehicle, cargo);
 
         // Рассчитываем экономические показатели
@@ -139,6 +152,68 @@ public class RouteController {
             @Parameter(description = "Данные маршрута")
             @Valid @RequestBody RouteCreateUpdateDto routeDto) {
         return ResponseEntity.ok(routeService.createRoute(routeDto));
+    }
+
+    /**
+     * Новый эндпоинт для получения прогноза погоды для маршрута
+     */
+    @PostMapping("/weather-forecast")
+    @Operation(summary = "Получить прогноз погоды для маршрута",
+            description = "Анализирует погодные условия вдоль маршрута с учетом времени движения")
+    public ResponseEntity<RouteWeatherForecastDto> getRouteWeatherForecast(
+            @RequestBody RouteResponseDto route,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime departureTime) {
+
+        // Если время отправления не указано, используем текущее время + 1 час
+        if (departureTime == null) {
+            departureTime = LocalDateTime.now().plusHours(1);
+        }
+
+        try {
+            RouteWeatherForecastDto forecast =
+                    routeWeatherService.generateRouteWeatherForecast(route, departureTime);
+
+            if (forecast == null) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            return ResponseEntity.ok(forecast);
+        } catch (Exception e) {
+            log.error("Ошибка при получении прогноза погоды для маршрута: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Новый эндпоинт для получения погодных предупреждений на маршруте
+     */
+    @PostMapping("/weather-hazards")
+    @Operation(summary = "Получить предупреждения о погодных опасностях на маршруте",
+            description = "Возвращает список предупреждений о погодных опасностях с рекомендациями")
+    public ResponseEntity<List<WeatherHazardWarningDto>> getWeatherHazards(
+            @RequestBody RouteResponseDto route,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime departureTime) {
+
+        // Если время отправления не указано, используем текущее время + 1 час
+        if (departureTime == null) {
+            departureTime = LocalDateTime.now().plusHours(1);
+        }
+
+        try {
+            RouteWeatherForecastDto forecast =
+                    routeWeatherService.generateRouteWeatherForecast(route, departureTime);
+
+            if (forecast == null) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            return ResponseEntity.ok(forecast.getHazardWarnings());
+        } catch (Exception e) {
+            log.error("Ошибка при получении погодных предупреждений для маршрута: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     /**

@@ -9,6 +9,7 @@ import org.geolatte.geom.LineString;
 import org.geolatte.geom.G2D;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,6 +35,9 @@ public class RouteResponseDto {
 
     // Список инструкций
     private List<Instruction> instructions = new ArrayList<>();
+
+    // Время отправления
+    private LocalDateTime departureTime;
 
     // Информация о рисках
     private BigDecimal weatherRiskScore;
