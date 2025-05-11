@@ -8,7 +8,7 @@ import ru.maslov.trucknavigator.dto.driver.DriverSummaryDto;
 import ru.maslov.trucknavigator.entity.Driver;
 import ru.maslov.trucknavigator.exception.EntityNotFoundException;
 import ru.maslov.trucknavigator.repository.DriverRepository;
-import ru.maslov.trucknavigator.service.mapper.DriverMapper;
+import ru.maslov.trucknavigator.mapper.DriverMapper;
 
 import java.util.List;
 import java.util.Optional;

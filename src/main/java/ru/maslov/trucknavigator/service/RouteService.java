@@ -3,183 +3,133 @@ package ru.maslov.trucknavigator.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.maslov.trucknavigator.dto.routing.RouteCreateUpdateDto;
-import ru.maslov.trucknavigator.dto.routing.RouteDetailDto;
-import ru.maslov.trucknavigator.dto.routing.RouteSummaryDto;
-import ru.maslov.trucknavigator.entity.Cargo;
-import ru.maslov.trucknavigator.entity.Driver;
-import ru.maslov.trucknavigator.entity.Route;
-import ru.maslov.trucknavigator.entity.Vehicle;
-import ru.maslov.trucknavigator.entity.Waypoint;
+import ru.maslov.trucknavigator.dto.routing.*;
+import ru.maslov.trucknavigator.entity.*;
 import ru.maslov.trucknavigator.exception.EntityNotFoundException;
+import ru.maslov.trucknavigator.mapper.RouteMapper;
 import ru.maslov.trucknavigator.repository.RouteRepository;
-import ru.maslov.trucknavigator.service.mapper.RouteMapper;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
-/**
- * Сервис для работы с маршрутами.
- */
 @Service
 @RequiredArgsConstructor
 public class RouteService {
-
     private final RouteRepository routeRepository;
     private final VehicleService vehicleService;
     private final DriverService driverService;
     private final CargoService cargoService;
     private final RouteMapper routeMapper;
+    private final WaypointService waypointService;
 
-    /**
-     * Получает все маршруты в виде DTO для списка.
-     */
     public List<RouteSummaryDto> findAllSummaries() {
-        return routeRepository.findAll().stream()
+        return routeRepository.findAll()
+                .stream()
                 .map(routeMapper::toSummaryDto)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Получает маршрут по идентификатору.
-     */
-    public Optional<Route> findById(Long id) {
-        return routeRepository.findById(id);
-    }
-
-    /**
-     * Получает детальную информацию о маршруте по идентификатору.
-     */
     public RouteDetailDto findDetailById(Long id) {
         Route route = routeRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Route", id));
-        return routeMapper.toDetailDto(route);
+
+        // 1) Маппим базовые поля
+        RouteDetailDto dto = routeMapper.toDetailDto(route);
+
+        // 2) Точки: Entity → вложенный DTO
+        List<RouteDetailDto.WaypointDto> wps = waypointService.listWaypoints(id)
+                .stream()
+                .map(routeMapper::waypointDtoToRouteDetailWaypointDto)
+                .collect(Collectors.toList());
+        dto.setWaypoints(wps);
+
+        return dto;
     }
 
-    /**
-     * Создает новый маршрут на основе DTO.
-     */
     @Transactional
-    public RouteDetailDto createRoute(RouteCreateUpdateDto dto) {
-        // Получаем связанные сущности
-        Vehicle vehicle = null;
-        if (dto.getVehicleId() != null) {
-            vehicle = vehicleService.findById(dto.getVehicleId())
-                    .orElseThrow(() -> new EntityNotFoundException("Vehicle", dto.getVehicleId()));
-        }
+    public RouteDetailDto createRoute(RouteCreateUpdateDto in) {
+        final var ent = getRelatedEntities(in);
 
-        Driver driver = null;
-        if (dto.getDriverId() != null) {
-            driver = driverService.findById(dto.getDriverId())
-                    .orElseThrow(() -> new EntityNotFoundException("Driver", dto.getDriverId()));
-        }
-
-        Cargo cargo = null;
-        if (dto.getCargoId() != null) {
-            cargo = cargoService.findById(dto.getCargoId())
-                    .orElseThrow(() -> new EntityNotFoundException("Cargo", dto.getCargoId()));
-        }
-
-        // Создаем маршрут
-        Route route = routeMapper.toEntity(dto, null, vehicle, driver, cargo);
-
-        // Сохраняем маршрут
+        // 1) сохраним базу маршрута
+        Route route = routeMapper.toEntity(in, null,
+                ent.vehicle, ent.driver, ent.cargo);
         route = routeRepository.save(route);
+        final Long routeId = route.getId();
 
-        // Обрабатываем промежуточные точки
-        if (dto.getWaypoints() != null && !dto.getWaypoints().isEmpty()) {
-            createWaypoints(route, dto.getWaypoints());
+        // 2) сконвертим вложенный DTO → глобальный WaypointDto
+        if (in.getWaypoints() != null) {
+            List<WaypointDto> wps = in.getWaypoints().stream()
+                    .map(src -> createWaypointDto(src, routeId))
+                    .collect(Collectors.toList());
+            waypointService.createWaypointsForRoute(route, wps);
         }
 
-        // Возвращаем детали созданного маршрута
-        return routeMapper.toDetailDto(route);
+        // 3) отдадим полные детали с точками
+        return findDetailById(routeId);
     }
 
-    /**
-     * Обновляет существующий маршрут.
-     */
     @Transactional
-    public RouteDetailDto updateRoute(Long id, RouteCreateUpdateDto dto) {
-        // Находим существующий маршрут
-        Route existingRoute = routeRepository.findById(id)
+    public RouteDetailDto updateRoute(Long id, RouteCreateUpdateDto in) {
+        Route existing = routeRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Route", id));
+        final var ent = getRelatedEntities(in);
 
-        // Получаем связанные сущности
-        Vehicle vehicle = null;
-        if (dto.getVehicleId() != null) {
-            vehicle = vehicleService.findById(dto.getVehicleId())
-                    .orElseThrow(() -> new EntityNotFoundException("Vehicle", dto.getVehicleId()));
+        // 1) обновим базу маршрута
+        Route updated = routeMapper.toEntity(in, existing,
+                ent.vehicle, ent.driver, ent.cargo);
+        updated = routeRepository.save(updated);
+        final Long routeId = updated.getId();
+
+        // 2) обновим точки
+        if (in.getWaypoints() != null) {
+            List<WaypointDto> wps = in.getWaypoints().stream()
+                    .map(src -> createWaypointDto(src, routeId))
+                    .collect(Collectors.toList());
+            waypointService.updateWaypointsForRoute(updated, wps);
         }
 
-        Driver driver = null;
-        if (dto.getDriverId() != null) {
-            driver = driverService.findById(dto.getDriverId())
-                    .orElseThrow(() -> new EntityNotFoundException("Driver", dto.getDriverId()));
-        }
-
-        Cargo cargo = null;
-        if (dto.getCargoId() != null) {
-            cargo = cargoService.findById(dto.getCargoId())
-                    .orElseThrow(() -> new EntityNotFoundException("Cargo", dto.getCargoId()));
-        }
-
-        // Обновляем маршрут
-        Route updatedRoute = routeMapper.toEntity(dto, existingRoute, vehicle, driver, cargo);
-
-        // Сохраняем маршрут
-        updatedRoute = routeRepository.save(updatedRoute);
-
-        // Обрабатываем промежуточные точки
-        if (dto.getWaypoints() != null) {
-            // Обычно здесь логика удаления старых и создания новых точек
-            // Для простоты примера просто создаем новые
-            createWaypoints(updatedRoute, dto.getWaypoints());
-        }
-
-        // Возвращаем детали обновленного маршрута
-        return routeMapper.toDetailDto(updatedRoute);
+        // 3) вернём детали
+        return findDetailById(routeId);
     }
 
-    /**
-     * Удаляет маршрут по идентификатору.
-     */
     @Transactional
     public void deleteById(Long id) {
         if (!routeRepository.existsById(id)) {
             throw new EntityNotFoundException("Route", id);
         }
+        waypointService.deleteAllForRoute(id);
         routeRepository.deleteById(id);
     }
 
-    /**
-     * Проверяет наличие маршрута по идентификатору.
-     */
-    public boolean existsById(Long id) {
-        return routeRepository.existsById(id);
+    private WaypointDto createWaypointDto(RouteCreateUpdateDto.WaypointDto src, Long routeId) {
+        return WaypointDto.builder()
+                .name(src.getName())
+                .address(src.getAddress())
+                .latitude(src.getLatitude())
+                .longitude(src.getLongitude())
+                .type(src.getWaypointType())
+                .stayDurationMinutes(src.getStayDurationMinutes())
+                .routeId(routeId)
+                .build();
     }
 
-    /**
-     * Сохраняет маршрут.
-     */
-    public Route save(Route route) {
-        return routeRepository.save(route);
-    }
-
-    /**
-     * Получает все маршруты.
-     *
-     * @return список всех маршрутов
-     */
-    public List<Route> findAll() {
-        return routeRepository.findAll();
-    }
-
-    /**
-     * Создает промежуточные точки для маршрута.
-     */
-    private void createWaypoints(Route route, List<RouteCreateUpdateDto.WaypointDto> waypointDtos) {
-        // Реализация создания промежуточных точек
-        // Здесь должна быть логика создания и сохранения Waypoint сущностей
+    /** Вспомогательный метод для vehicle/driver/cargo */
+    private record RelatedEntities(
+            Vehicle vehicle, Driver driver, Cargo cargo
+    ){}
+    private RelatedEntities getRelatedEntities(RouteCreateUpdateDto dto) {
+        Vehicle v = dto.getVehicleId() == null
+                ? null
+                : vehicleService.findById(dto.getVehicleId())
+                .orElseThrow(() -> new EntityNotFoundException("Vehicle", dto.getVehicleId()));
+        Driver d = dto.getDriverId() == null
+                ? null
+                : driverService.findById(dto.getDriverId())
+                .orElseThrow(() -> new EntityNotFoundException("Driver", dto.getDriverId()));
+        Cargo c = dto.getCargoId() == null
+                ? null
+                : cargoService.findById(dto.getCargoId())
+                .orElseThrow(() -> new EntityNotFoundException("Cargo", dto.getCargoId()));
+        return new RelatedEntities(v, d, c);
     }
 }

@@ -8,7 +8,7 @@ import ru.maslov.trucknavigator.dto.cargo.CargoSummaryDto;
 import ru.maslov.trucknavigator.entity.Cargo;
 import ru.maslov.trucknavigator.exception.EntityNotFoundException;
 import ru.maslov.trucknavigator.repository.CargoRepository;
-import ru.maslov.trucknavigator.service.mapper.CargoMapper;
+import ru.maslov.trucknavigator.mapper.CargoMapper;
 
 import java.util.List;
 import java.util.Optional;

@@ -8,7 +8,7 @@ import ru.maslov.trucknavigator.dto.vehicle.VehicleSummaryDto;
 import ru.maslov.trucknavigator.entity.Vehicle;
 import ru.maslov.trucknavigator.exception.EntityNotFoundException;
 import ru.maslov.trucknavigator.repository.VehicleRepository;
-import ru.maslov.trucknavigator.service.mapper.VehicleMapper;
+import ru.maslov.trucknavigator.mapper.VehicleMapper;
 
 import java.math.BigDecimal;
 import java.util.List;
