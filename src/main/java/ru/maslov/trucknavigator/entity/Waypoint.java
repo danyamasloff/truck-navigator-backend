@@ -9,9 +9,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * Сущность, представляющая промежуточную точку (waypoint) на маршруте.
- * Может использоваться для обозначения остановок, пунктов погрузки/разгрузки,
- * мест отдыха и других ключевых точек.
+ * Сущность промежуточной точки маршрута.
  */
 @Entity
 @Table(name = "waypoints")
@@ -21,55 +19,114 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class Waypoint {
 
+    /**
+     * Типы промежуточных точек.
+     */
+    public enum WaypointType {
+        WAYPOINT,      // Обычная промежуточная точка
+        PICKUP,        // Точка погрузки
+        DELIVERY,      // Точка разгрузки
+        FUEL,          // Заправка
+        FOOD,          // Место приема пищи
+        REST,          // Место отдыха
+        LODGING,       // Место ночлега
+        CUSTOMS,       // Таможенный пункт
+        TECHNICAL      // Техническая остановка
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * Маршрут, к которому относится точка.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_id", nullable = false)
     private Route route;
 
+    /**
+     * Порядковый номер точки в маршруте.
+     */
     @Column(name = "order_index", nullable = false)
     private Integer orderIndex;
 
-    @Column(name = "name")
+    /**
+     * Название точки.
+     */
+    @Column(name = "name", length = 100)
     private String name;
 
-    @Column(name = "address")
+    /**
+     * Адрес точки.
+     */
+    @Column(name = "address", length = 255)
     private String address;
 
+    /**
+     * Широта.
+     */
     @Column(name = "latitude", nullable = false)
     private Double latitude;
 
+    /**
+     * Долгота.
+     */
     @Column(name = "longitude", nullable = false)
     private Double longitude;
 
-    @Column(name = "waypoint_type")
+    /**
+     * Тип точки.
+     */
     @Enumerated(EnumType.STRING)
+    @Column(name = "waypoint_type")
     private WaypointType waypointType;
 
+    /**
+     * Запланированное время прибытия.
+     */
     @Column(name = "planned_arrival_time")
     private LocalDateTime plannedArrivalTime;
 
+    /**
+     * Запланированное время отправления.
+     */
     @Column(name = "planned_departure_time")
     private LocalDateTime plannedDepartureTime;
 
+    /**
+     * Фактическое время прибытия.
+     */
     @Column(name = "actual_arrival_time")
     private LocalDateTime actualArrivalTime;
 
+    /**
+     * Фактическое время отправления.
+     */
     @Column(name = "actual_departure_time")
     private LocalDateTime actualDepartureTime;
 
+    /**
+     * Планируемая длительность остановки в минутах.
+     */
     @Column(name = "stay_duration_minutes")
     private Integer stayDurationMinutes;
 
-    @Column(name = "notes")
-    private String notes;
+    /**
+     * Дополнительная информация о точке.
+     */
+    @Column(name = "additional_info", length = 500)
+    private String additionalInfo;
 
-    // Метаданные для аудита
-    @Column(name = "created_at", nullable = false, updatable = false)
+    /**
+     * Время создания записи.
+     */
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    /**
+     * Время последнего обновления записи.
+     */
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
@@ -82,20 +139,5 @@ public class Waypoint {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
-    }
-
-    /**
-     * Типы промежуточных точек
-     */
-    public enum WaypointType {
-        LOADING,            // Пункт погрузки
-        UNLOADING,          // Пункт разгрузки
-        REST,               // Место отдыха
-        FUEL,               // Заправка
-        CUSTOMS,            // Таможня
-        TOLL,               // Пункт оплаты дорожного сбора
-        WEIGHING,           // Пункт взвешивания
-        TECHNICAL_STOP,     // Техническая остановка
-        OTHER               // Другое
     }
 }

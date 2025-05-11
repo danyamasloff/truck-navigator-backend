@@ -27,9 +27,15 @@ public class RouteSummaryDto {
     private LocalDateTime estimatedArrivalTime;
     private BigDecimal distanceKm;
     private Integer estimatedDurationMinutes;
+
+    // Связанные сущности (имена и ID)
     private String vehicleName;
+    private Long vehicleId;
     private String driverName;
+    private Long driverId;
     private String cargoName;
+    private Long cargoId;
+
     private BigDecimal estimatedTotalCost;
     private Route.RouteStatus status;
     private BigDecimal overallRiskScore;
@@ -55,5 +61,27 @@ public class RouteSummaryDto {
         return hours > 0
                 ? String.format("%dч %dмин", hours, minutes)
                 : String.format("%dмин", minutes);
+    }
+
+    /**
+     * Преобразует сводную информацию в детальную DTO.
+     */
+    public RouteDetailDto toDetailDto() {
+        RouteDetailDto detailDto = new RouteDetailDto();
+        detailDto.setId(this.id);
+        detailDto.setName(this.name);
+        detailDto.setStartAddress(this.startAddress);
+        detailDto.setEndAddress(this.endAddress);
+        detailDto.setDepartureTime(this.departureTime);
+        detailDto.setEstimatedArrivalTime(this.estimatedArrivalTime);
+        detailDto.setDistanceKm(this.distanceKm);
+        detailDto.setEstimatedDurationMinutes(this.estimatedDurationMinutes);
+        detailDto.setEstimatedTotalCost(this.estimatedTotalCost);
+        detailDto.setStatus(this.status);
+        detailDto.setOverallRiskScore(this.overallRiskScore);
+
+        // Связанные сущности добавляются отдельно
+
+        return detailDto;
     }
 }

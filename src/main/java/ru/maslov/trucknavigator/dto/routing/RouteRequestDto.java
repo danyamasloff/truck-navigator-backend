@@ -33,6 +33,12 @@ public class RouteRequestDto {
     // Промежуточные точки (waypoints)
     private List<WaypointDto> waypoints = new ArrayList<>();
 
+    // GraphHopper API параметры
+    private String profile;
+    private boolean calcPoints;
+    private boolean instructions;
+    private boolean pointsEncoded;
+
     // Идентификаторы связанных сущностей
     private Long vehicleId;
     private Long driverId;
@@ -60,5 +66,7 @@ public class RouteRequestDto {
         private String address;
         private String name;
         private String waypointType;
+        private boolean stopover;
+        private int stopDuration;
     }
 }
