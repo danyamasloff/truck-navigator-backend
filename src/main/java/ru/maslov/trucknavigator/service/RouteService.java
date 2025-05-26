@@ -10,6 +10,7 @@ import ru.maslov.trucknavigator.mapper.RouteMapper;
 import ru.maslov.trucknavigator.repository.RouteRepository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,6 +22,15 @@ public class RouteService {
     private final CargoService cargoService;
     private final RouteMapper routeMapper;
     private final WaypointService waypointService;
+
+    public Optional<Route> findById(Long id) {
+        return routeRepository.findById(id);
+    }
+
+    @Transactional
+    public Route save(Route route) {
+        return routeRepository.save(route);
+    }
 
     public List<RouteSummaryDto> findAllSummaries() {
         return routeRepository.findAll()

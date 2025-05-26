@@ -1,91 +1,69 @@
 package ru.maslov.trucknavigator.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import ru.maslov.trucknavigator.dto.analytics.DriverRestAnalysisDto;
 import ru.maslov.trucknavigator.dto.driver.DriverDetailDto;
-import ru.maslov.trucknavigator.dto.driver.DriverRestAnalysisDto;
+import ru.maslov.trucknavigator.dto.driver.DriverMedicalDto;
+import ru.maslov.trucknavigator.dto.driver.DriverPerformanceDto;
 import ru.maslov.trucknavigator.dto.driver.DriverSummaryDto;
-import ru.maslov.trucknavigator.dto.routing.RouteResponseDto;
 import ru.maslov.trucknavigator.entity.Driver;
-import ru.maslov.trucknavigator.service.DriverRestTimeService;
+import ru.maslov.trucknavigator.entity.Route;
+import ru.maslov.trucknavigator.exception.EntityNotFoundException;
 import ru.maslov.trucknavigator.service.DriverService;
+import ru.maslov.trucknavigator.service.RouteService;
+import ru.maslov.trucknavigator.service.analytics.DriverPerformanceService;
+import ru.maslov.trucknavigator.service.analytics.DriverRestAnalysisService;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
-/**
- * Контроллер для работы с водителями.
- * Предоставляет API для создания, получения и обновления данных водителей,
- * а также для анализа режима труда и отдыха.
- */
 @RestController
 @RequestMapping("/api/drivers")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Водители", description = "API для работы с данными водителей и анализа РТО")
+@Tag(name = "Водители", description = "API для управления водителями и анализа их данных")
 public class DriverController {
 
     private final DriverService driverService;
-    private final DriverRestTimeService driverRestTimeService;
+    private final RouteService routeService;
+    private final DriverRestAnalysisService driverRestService;
+    private final DriverPerformanceService performanceService;
 
-    /**
-     * Получение списка всех водителей.
-     *
-     * @return список водителей в формате DTO
-     */
     @GetMapping
     @Operation(summary = "Получить всех водителей", description = "Возвращает список всех водителей")
+    @PreAuthorize("hasAnyRole('DRIVER', 'DISPATCHER', 'MANAGER', 'ADMIN')")
     public ResponseEntity<List<DriverSummaryDto>> getAllDrivers() {
         return ResponseEntity.ok(driverService.findAllSummaries());
     }
 
-    /**
-     * Получение водителя по ID.
-     *
-     * @param id идентификатор водителя
-     * @return водитель в формате детального DTO
-     */
     @GetMapping("/{id}")
-    @Operation(summary = "Получить водителя по ID", description = "Возвращает водителя по указанному идентификатору")
-    public ResponseEntity<DriverDetailDto> getDriverById(
-            @Parameter(description = "Идентификатор водителя") @PathVariable Long id) {
+    @Operation(summary = "Получить водителя по ID", description = "Возвращает детальную информацию о водителе")
+    @PreAuthorize("hasAnyRole('DRIVER', 'DISPATCHER', 'MANAGER', 'ADMIN')")
+    public ResponseEntity<DriverDetailDto> getDriverById(@PathVariable Long id) {
         return ResponseEntity.ok(driverService.findDetailById(id));
     }
 
-    /**
-     * Создание нового водителя.
-     *
-     * @param driver данные нового водителя
-     * @return созданный водитель в формате детального DTO
-     */
     @PostMapping
     @Operation(summary = "Создать водителя", description = "Создает нового водителя на основе переданных данных")
-    public ResponseEntity<DriverDetailDto> createDriver(
-            @Parameter(description = "Данные водителя")
-            @Valid @RequestBody Driver driver) {
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    public ResponseEntity<DriverDetailDto> createDriver(@Valid @RequestBody Driver driver) {
         return ResponseEntity.ok(driverService.saveAndGetDto(driver));
     }
 
-    /**
-     * Обновление водителя.
-     *
-     * @param id идентификатор водителя
-     * @param driver обновленные данные водителя
-     * @return обновленный водитель в формате детального DTO
-     */
     @PutMapping("/{id}")
     @Operation(summary = "Обновить водителя", description = "Обновляет существующего водителя")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<DriverDetailDto> updateDriver(
-            @Parameter(description = "Идентификатор водителя") @PathVariable Long id,
-            @Parameter(description = "Обновленные данные водителя")
-            @Valid @RequestBody Driver driver) {
+            @PathVariable Long id, @Valid @RequestBody Driver driver) {
 
         if (!driverService.existsById(id)) {
             return ResponseEntity.notFound().build();
@@ -95,73 +73,102 @@ public class DriverController {
         return ResponseEntity.ok(driverService.saveAndGetDto(driver));
     }
 
-    /**
-     * Удаление водителя.
-     *
-     * @param id идентификатор водителя
-     * @return результат операции
-     */
     @DeleteMapping("/{id}")
-    @Operation(summary = "Удалить водителя", description = "Удаляет водителя по указанному идентификатору")
-    public ResponseEntity<Void> deleteDriver(
-            @Parameter(description = "Идентификатор водителя") @PathVariable Long id) {
-
+    @Operation(summary = "Удалить водителя", description = "Удаляет водителя по указанному ID")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteDriver(@PathVariable Long id) {
         driverService.deleteById(id);
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Анализ режима труда и отдыха водителя для маршрута.
-     *
-     * @param driverId идентификатор водителя
-     * @param route данные маршрута
-     * @param departureTime время отправления
-     * @return результат анализа РТО
-     */
-    @PostMapping("/{driverId}/analyze-rest-time")
-    @Operation(summary = "Анализ РТО",
-            description = "Анализирует режим труда и отдыха водителя для заданного маршрута")
+    // Эндпоинты для режима труда и отдыха (РТО)
+
+    @GetMapping("/{driverId}/rest-analysis/route/{routeId}")
+    @Operation(summary = "Анализ РТО для маршрута",
+            description = "Анализирует режим труда и отдыха водителя для указанного маршрута")
+    @PreAuthorize("hasAnyRole('DRIVER', 'DISPATCHER', 'MANAGER', 'ADMIN')")
     public ResponseEntity<DriverRestAnalysisDto> analyzeDriverRestTime(
-            @Parameter(description = "Идентификатор водителя") @PathVariable Long driverId,
-            @Parameter(description = "Данные маршрута") @RequestBody RouteResponseDto route,
-            @Parameter(description = "Время отправления (в формате ISO)")
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime departureTime) {
+            @PathVariable Long driverId,
+            @PathVariable Long routeId) {
 
-        Driver driver = driverService.findById(driverId).orElse(null);
-        if (driver == null || route == null) {
-            return ResponseEntity.badRequest().build();
-        }
+        Driver driver = driverService.findById(driverId)
+                .orElseThrow(() -> new EntityNotFoundException("Driver", driverId));
 
-        DriverRestAnalysisDto analysis = driverRestTimeService.analyzeDriverRestTime(driver, route, departureTime);
+        Route route = routeService.findById(routeId)
+                .orElseThrow(() -> new EntityNotFoundException("Route", routeId));
+
+        DriverRestAnalysisDto analysis = driverRestService.analyzeDriverRestTime(driver, route);
+
         return ResponseEntity.ok(analysis);
     }
 
-    /**
-     * Обновление статуса водителя (режим труда и отдыха).
-     *
-     * @param driverId идентификатор водителя
-     * @param status новый статус водителя
-     * @param timestamp время изменения статуса
-     * @return обновленный водитель в формате детального DTO
-     */
     @PutMapping("/{driverId}/status")
     @Operation(summary = "Обновить статус водителя",
             description = "Обновляет статус водителя в системе контроля РТО")
+    @PreAuthorize("hasAnyRole('DRIVER', 'DISPATCHER', 'MANAGER', 'ADMIN')")
     public ResponseEntity<DriverDetailDto> updateDriverStatus(
-            @Parameter(description = "Идентификатор водителя") @PathVariable Long driverId,
-            @Parameter(description = "Новый статус (DRIVING, REST_BREAK, DAILY_REST и т.д.)")
+            @PathVariable Long driverId,
             @RequestParam Driver.DrivingStatus status,
-            @Parameter(description = "Время изменения статуса (в формате ISO)")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime timestamp) {
 
-        Driver driver = driverService.findById(driverId).orElse(null);
-        if (driver == null) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok(driverService.updateDriverStatus(driverId, status, timestamp));
+    }
 
-        driver = driverRestTimeService.updateDriverStatus(driver, status, timestamp);
-        driver = driverService.save(driver);
+    // Эндпоинты для медицинских данных
 
-        return ResponseEntity.ok(driverService.findDetailById(driver.getId()));
+    @GetMapping("/{driverId}/medical")
+    @Operation(summary = "Получить медицинские данные",
+            description = "Возвращает информацию о медицинских показателях водителя")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'MEDICAL_STAFF')")
+    public ResponseEntity<DriverMedicalDto> getDriverMedical(@PathVariable Long driverId) {
+        return ResponseEntity.ok(driverService.getDriverMedical(driverId));
+    }
+
+    @PutMapping("/{driverId}/medical")
+    @Operation(summary = "Обновить медицинские данные",
+            description = "Обновляет информацию о медицинских показателях водителя")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'MEDICAL_STAFF')")
+    public ResponseEntity<DriverMedicalDto> updateDriverMedical(
+            @PathVariable Long driverId,
+            @Valid @RequestBody DriverMedicalDto medicalDto) {
+
+        return ResponseEntity.ok(driverService.updateDriverMedical(driverId, medicalDto));
+    }
+
+    // Эндпоинты для квалификации
+
+    @GetMapping("/{driverId}/qualifications")
+    @Operation(summary = "Получить квалификации водителя",
+            description = "Возвращает информацию о квалификациях и допусках водителя")
+    @PreAuthorize("hasAnyRole('DRIVER', 'DISPATCHER', 'MANAGER', 'ADMIN')")
+    public ResponseEntity<Set<String>> getDriverQualifications(@PathVariable Long driverId) {
+        return ResponseEntity.ok(driverService.getDriverQualifications(driverId));
+    }
+
+    @PutMapping("/{driverId}/qualifications")
+    @Operation(summary = "Обновить квалификации водителя",
+            description = "Обновляет информацию о квалификациях и допусках водителя")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    public ResponseEntity<Set<String>> updateDriverQualifications(
+            @PathVariable Long driverId,
+            @RequestBody Set<String> qualifications) {
+
+        return ResponseEntity.ok(driverService.updateDriverQualifications(driverId, qualifications));
+    }
+
+    // Эндпоинты для эффективности
+
+    @GetMapping("/{driverId}/performance")
+    @Operation(summary = "Анализ эффективности водителя",
+            description = "Возвращает показатели эффективности работы водителя")
+    @PreAuthorize("hasAnyRole('DISPATCHER', 'MANAGER', 'ADMIN')")
+    public ResponseEntity<DriverPerformanceDto> getDriverPerformance(
+            @PathVariable Long driverId,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd")
+            LocalDateTime startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd")
+            LocalDateTime endDate) {
+
+        return ResponseEntity.ok(performanceService.analyzeDriverPerformance(driverId, startDate, endDate));
     }
 }

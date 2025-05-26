@@ -62,7 +62,7 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui.html").permitAll()
 
                         // Эндпоинты для получения данных доступны всем аутентифицированным пользователям
-                        .requestMatchers(HttpMethod.GET, "/api/routes/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/routes/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/vehicles/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/drivers/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/cargos/**").authenticated()
@@ -72,10 +72,16 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/**").hasAnyRole("ADMIN", "DISPATCHER")
                         .requestMatchers(HttpMethod.DELETE, "/api/**").hasAnyRole("ADMIN")
 
+                        // Эндпоинты для получения данных - доступны всем аутентифицированным пользователям
+                        .requestMatchers("/api/routes/calculate").authenticated()
+                        .requestMatchers("/api/cargos/**").authenticated()
+                        .requestMatchers("/api/vehicles/**").authenticated()
+                        .requestMatchers("/api/drivers/**").authenticated()
+
                         // Эндпоинты для расчета маршрутов доступны всем аутентифицированным пользователям
                         .requestMatchers("/api/routes/calculate").authenticated()
 
-                        // Все остальные запросы требуют аутентификации
+                        // Остальные запросы требуют аутентификации и проверяются через @PreAuthorize
                         .anyRequest().authenticated()
                 );
 
@@ -118,11 +124,39 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:3000", "https://truck-navigator.ru"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
+
+        // Разрешенные источники запросов
+        configuration.setAllowedOrigins(List.of(
+                "http://localhost:3000",      // Dev React
+                "http://localhost:5173",      // Dev Vite (если используете стандартный порт Vite)
+                "https://truck-navigator.ru"  // Production
+        ));
+
+        // Разрешенные методы HTTP
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+
+        // Разрешенные заголовки запросов
+        configuration.setAllowedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "X-Requested-With",
+                "Accept",
+                "Origin",
+                "Access-Control-Request-Method",
+                "Access-Control-Request-Headers"
+        ));
+
+        // Разрешить куки и заголовки авторизации
         configuration.setAllowCredentials(true);
-        configuration.setExposedHeaders(List.of("Authorization"));
+
+        // Заголовки, которые клиент может использовать в ответе
+        configuration.setExposedHeaders(List.of(
+                "Authorization",
+                "Access-Control-Allow-Origin",
+                "Access-Control-Allow-Credentials"
+        ));
+
+        // Время кэширования предварительного запроса (preflight)
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

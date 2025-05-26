@@ -13,7 +13,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import io.jsonwebtoken.Jwts;
 
-
 import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;

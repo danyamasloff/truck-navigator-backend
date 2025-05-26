@@ -50,7 +50,7 @@ public class RouteController {
     private final CargoService cargoService;
     private final GraphHopperService graphHopperService;
     private final GeocodingService geocodingService;
-    private final RiskAnalysisService riskAnalysisService;
+    private final RouteConditionRiskAnalysisService riskAnalysisService;
     private final ProfitabilityService profitabilityService;
     private final ComplianceService complianceService;
     private final RouteWeatherService routeWeatherService;

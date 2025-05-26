@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -112,4 +113,37 @@ public class Vehicle {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    // Добавленные поля для технического состояния
+    @Column(name = "last_maintenance_date")
+    private LocalDate lastMaintenanceDate;
+
+    @Column(name = "next_maintenance_date")
+    private LocalDate nextMaintenanceDate;
+
+    @Column(name = "maintenance_interval_km")
+    private Integer maintenanceIntervalKm;
+
+    // Эксплуатационные характеристики
+    @Column(name = "avg_speed_kmh")
+    private Double avgSpeedKmh;
+
+    @Column(name = "avg_idle_time_percent")
+    private Double avgIdleTimePercent;
+
+    @Column(name = "actual_fuel_consumption_per_100km")
+    private BigDecimal actualFuelConsumptionPer100km;
+
+    @Column(name = "adr_certificate_number")
+    private String adrCertificateNumber;
+
+    @Column(name = "adr_certificate_expiry_date")
+    private LocalDate adrCertificateExpiryDate;
+
+    // Дополнительные характеристики для аналитики
+    @Column(name = "avg_maintenance_cost_per_km")
+    private BigDecimal avgMaintenanceCostPerKm;
+
+    @Column(name = "vehicle_depreciation_per_km")
+    private BigDecimal vehicleDepreciationPerKm;
 }
