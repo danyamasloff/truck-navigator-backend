@@ -24,7 +24,7 @@ import java.util.Random;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class RiskAnalysisService {
+public class    RouteConditionRiskAnalysisService {
 
     private final WeatherService weatherService;
     private final RouteWeatherService routeWeatherService;
