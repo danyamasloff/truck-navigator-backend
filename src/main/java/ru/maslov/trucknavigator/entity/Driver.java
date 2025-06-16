@@ -1,4 +1,5 @@
 package ru.maslov.trucknavigator.entity;
+import ru.maslov.trucknavigator.entity.DrivingStatus;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
@@ -178,15 +179,5 @@ public class Driver {
         updatedAt = LocalDateTime.now();
     }
 
-    /**
-     * Статусы вождения согласно режиму труда и отдыха
-     */
-    public enum DrivingStatus {
-        DRIVING,        // Вождение
-        REST_BREAK,     // Короткий перерыв
-        DAILY_REST,     // Ежедневный отдых
-        WEEKLY_REST,    // Еженедельный отдых
-        OTHER_WORK,     // Другая работа (погрузка/разгрузка и т.д.)
-        AVAILABILITY    // Доступность (не вождение, но на рабочем месте)
-    }
+
 }

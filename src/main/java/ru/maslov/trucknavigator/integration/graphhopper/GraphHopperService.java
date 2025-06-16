@@ -102,12 +102,54 @@ public class GraphHopperService {
         points.add(endPoint);
 
         // Профиль и параметры для расчета
-        requestBody.put("profile", "car");
+        String profile = determineProfile(request);
+        requestBody.put("profile", profile);
         requestBody.put("calc_points", true);
         requestBody.put("instructions", true);
         requestBody.put("points_encoded", false);
 
+        // Добавляем параметры избегания
+        if (request.isAvoidTolls()) {
+            requestBody.put("avoid", "toll");
+        }
+        if (request.isAvoidHighways()) {
+            ArrayNode avoid = requestBody.has("avoid") ? 
+                (ArrayNode) requestBody.get("avoid") : requestBody.putArray("avoid");
+            avoid.add("motorway");
+        }
+
+        // Добавляем параметры времени отправления для учета трафика
+        if (request.getDepartureTime() != null && request.isConsiderTraffic()) {
+            long departureTimestamp = request.getDepartureTime()
+                    .atZone(java.time.ZoneId.systemDefault()).toEpochSecond();
+            requestBody.put("departure_time", departureTimestamp);
+        }
+
+        log.debug("Создан запрос для GraphHopper: профиль={}, точек={}, избегание={}", 
+                profile, points.size(), 
+                request.isAvoidTolls() || request.isAvoidHighways() ? "да" : "нет");
+
         return requestBody;
+    }
+
+    /**
+     * Определяет профиль маршрутизации на основе запроса
+     */
+    private String determineProfile(RouteRequestDto request) {
+        // Проверяем, указан ли явно профиль в запросе
+        if (request.getProfile() != null && !request.getProfile().isBlank()) {
+            return request.getProfile();
+        }
+
+        // Определяем профиль по vehicleId или имени запроса
+        if (request.getVehicleId() != null) {
+            // В реальном случае здесь будет обращение к VehicleService
+            // для получения типа ТС и выбора соответствующего профиля
+            return "car"; // или "truck" в зависимости от типа ТС
+        }
+
+        // По умолчанию используем автомобильный профиль
+        return "car";
     }
 
     /**

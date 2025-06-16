@@ -1,4 +1,5 @@
 package ru.maslov.trucknavigator.service;
+import ru.maslov.trucknavigator.entity.DrivingStatus;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -133,7 +134,7 @@ public class DriverRestTimeService {
      */
     private int calculateRemainingContinuousDrivingTime(Driver driver) {
         // Если водитель в режиме вождения, вычитаем уже проведенное время
-        if (Driver.DrivingStatus.DRIVING.equals(driver.getCurrentDrivingStatus())
+        if (DrivingStatus.DRIVING.equals(driver.getCurrentDrivingStatus())
                 && driver.getCurrentStatusStartTime() != null
                 && driver.getContinuousDrivingMinutes() != null) {
 
@@ -842,7 +843,7 @@ public class DriverRestTimeService {
      * @param status статус вождения
      * @return строковое представление статуса
      */
-    private String formatDrivingStatus(Driver.DrivingStatus status) {
+    private String formatDrivingStatus(DrivingStatus status) {
         if (status == null) {
             return "Неизвестно";
         }
@@ -873,13 +874,13 @@ public class DriverRestTimeService {
      * @param statusChangeTime время изменения статуса
      * @return обновленный объект водителя
      */
-    public Driver updateDriverStatus(Driver driver, Driver.DrivingStatus newStatus, LocalDateTime statusChangeTime) {
+    public Driver updateDriverStatus(Driver driver, DrivingStatus newStatus, LocalDateTime statusChangeTime) {
         if (driver == null || newStatus == null || statusChangeTime == null) {
             return driver;
         }
 
         // Сохраняем старый статус для расчетов
-        Driver.DrivingStatus oldStatus = driver.getCurrentDrivingStatus();
+        DrivingStatus oldStatus = driver.getCurrentDrivingStatus();
         LocalDateTime oldStatusStartTime = driver.getCurrentStatusStartTime();
 
         // Если статус не меняется, просто возвращаем водителя
@@ -892,7 +893,7 @@ public class DriverRestTimeService {
             long minutesInPreviousStatus = Duration.between(oldStatusStartTime, statusChangeTime).toMinutes();
 
             // Обновляем счетчики в зависимости от старого статуса
-            if (Driver.DrivingStatus.DRIVING.equals(oldStatus)) {
+            if (DrivingStatus.DRIVING.equals(oldStatus)) {
                 // Увеличиваем счетчик непрерывного вождения
                 int continuousDriving = driver.getContinuousDrivingMinutes() != null ?
                         driver.getContinuousDrivingMinutes() : 0;
@@ -915,9 +916,9 @@ public class DriverRestTimeService {
         driver.setCurrentStatusStartTime(statusChangeTime);
 
         // Если новый статус - отдых, сбрасываем счетчик непрерывного вождения
-        if (Driver.DrivingStatus.REST_BREAK.equals(newStatus) ||
-                Driver.DrivingStatus.DAILY_REST.equals(newStatus) ||
-                Driver.DrivingStatus.WEEKLY_REST.equals(newStatus)) {
+        if (DrivingStatus.REST_BREAK.equals(newStatus) ||
+                DrivingStatus.DAILY_REST.equals(newStatus) ||
+                DrivingStatus.WEEKLY_REST.equals(newStatus)) {
 
             // Длительный отдых сбрасывает счетчик непрерывного вождения
             if (oldStatus != null && oldStatusStartTime != null) {
@@ -928,13 +929,13 @@ public class DriverRestTimeService {
             }
 
             // Суточный отдых сбрасывает счетчик суточного вождения
-            if (Driver.DrivingStatus.DAILY_REST.equals(newStatus) ||
-                    Driver.DrivingStatus.WEEKLY_REST.equals(newStatus)) {
+            if (DrivingStatus.DAILY_REST.equals(newStatus) ||
+                    DrivingStatus.WEEKLY_REST.equals(newStatus)) {
                 driver.setDailyDrivingMinutesToday(0);
             }
 
             // Недельный отдых сбрасывает счетчик недельного вождения
-            if (Driver.DrivingStatus.WEEKLY_REST.equals(newStatus)) {
+            if (DrivingStatus.WEEKLY_REST.equals(newStatus)) {
                 driver.setWeeklyDrivingMinutes(0);
             }
         }

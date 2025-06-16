@@ -1,8 +1,10 @@
 package ru.maslov.trucknavigator.config;
+import ru.maslov.trucknavigator.entity.DrivingStatus;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -12,11 +14,12 @@ import ru.maslov.trucknavigator.repository.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Компонент для инициализации тестовых данных при запуске приложения в dev-профиле.
- * Реализует CommandLineRunner для выполнения кода после загрузки контекста приложения.
+ * Создает пользователей, водителей, транспортные средства, грузы и маршруты для тестирования.
  */
 @Component
 @Profile("dev")
@@ -24,52 +27,50 @@ import java.util.*;
 @Slf4j
 public class DataInitializer implements CommandLineRunner {
 
-    private final VehicleRepository vehicleRepository;
-    private final DriverRepository driverRepository;
-    private final CargoRepository cargoRepository;
     private final UserRepository userRepository;
+    private final DriverRepository driverRepository;
+    private final VehicleRepository vehicleRepository;
+    private final CargoRepository cargoRepository;
     private final RouteRepository routeRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
     public void run(String... args) throws Exception {
         try {
-            log.info("Начало инициализации тестовых данных...");
+            log.info("🚀 Начало инициализации тестовых данных для TruckNavigator...");
 
-            boolean dataExists = userRepository.count() > 0 ||
-                    vehicleRepository.count() > 0 ||
-                    driverRepository.count() > 0 ||
-                    cargoRepository.count() > 0 ||
-                    routeRepository.count() > 0;
-
-            if (dataExists) {
-                log.info("Обнаружены существующие данные. Выполняется выборочная инициализация...");
-            }
-
+            // Инициализируем данные поэтапно с проверками
             if (userRepository.count() == 0) {
                 initUsers();
-            }
-
-            if (vehicleRepository.count() == 0) {
-                initVehicles();
+                log.info("✅ Пользователи созданы: {}", userRepository.count());
             }
 
             if (driverRepository.count() == 0) {
                 initDrivers();
+                log.info("✅ Водители созданы: {}", driverRepository.count());
+            }
+
+            if (vehicleRepository.count() == 0) {
+                initVehicles();
+                log.info("✅ ТС созданы: {}", vehicleRepository.count());
             }
 
             if (cargoRepository.count() == 0) {
                 initCargos();
+                log.info("✅ Грузы созданы: {}", cargoRepository.count());
             }
 
             if (routeRepository.count() == 0) {
                 initRoutes();
+                log.info("✅ Маршруты созданы: {}", routeRepository.count());
             }
 
-            log.info("Инициализация тестовых данных успешно завершена");
+            log.info("🎉 Инициализация тестовых данных завершена!");
+            logTestingInstructions();
+
         } catch (Exception e) {
-            log.error("Ошибка при инициализации тестовых данных: {}", e.getMessage(), e);
-            throw e; // Пробрасываем исключение, чтобы Spring мог его обработать
+            log.error("❌ Ошибка при инициализации тестовых данных: {}", e.getMessage(), e);
+            // Не прерываем запуск приложения, только логируем ошибку
         }
     }
 
@@ -77,10 +78,10 @@ public class DataInitializer implements CommandLineRunner {
      * Инициализирует тестовых пользователей с различными ролями
      */
     private void initUsers() {
-        log.info("Создание тестовых пользователей...");
+        log.info("👥 Создание тестовых пользователей...");
 
-        // Администратор
-        User admin = User.builder()
+        List<User> users = List.of(
+            User.builder()
                 .username("admin")
                 .password(passwordEncoder.encode("admin123"))
                 .email("admin@truck-navigator.ru")
@@ -89,22 +90,31 @@ public class DataInitializer implements CommandLineRunner {
                 .active(true)
                 .roles(Set.of("ROLE_ADMIN"))
                 .createdAt(LocalDateTime.now())
-                .build();
+                .build(),
 
-        // Диспетчер
-        User dispatcher = User.builder()
+            User.builder()
                 .username("dispatcher")
                 .password(passwordEncoder.encode("disp123"))
                 .email("dispatcher@truck-navigator.ru")
-                .firstName("Диспетчер")
-                .lastName("Смирнов")
+                .firstName("Александр")
+                .lastName("Диспетчеров")
                 .active(true)
                 .roles(Set.of("ROLE_DISPATCHER"))
                 .createdAt(LocalDateTime.now())
-                .build();
+                .build(),
 
-        // Водитель
-        User driver = User.builder()
+            User.builder()
+                .username("manager")
+                .password(passwordEncoder.encode("manager123"))
+                .email("manager@truck-navigator.ru")
+                .firstName("Елена")
+                .lastName("Менеджерова")
+                .active(true)
+                .roles(Set.of("ROLE_MANAGER"))
+                .createdAt(LocalDateTime.now())
+                .build(),
+
+            User.builder()
                 .username("driver")
                 .password(passwordEncoder.encode("driver123"))
                 .email("driver@truck-navigator.ru")
@@ -113,611 +123,488 @@ public class DataInitializer implements CommandLineRunner {
                 .active(true)
                 .roles(Set.of("ROLE_DRIVER"))
                 .createdAt(LocalDateTime.now())
-                .build();
+                .build(),
 
-        // Пользователь с несколькими ролями
-        User multiRole = User.builder()
-                .username("manager")
-                .password(passwordEncoder.encode("manager123"))
-                .email("manager@truck-navigator.ru")
-                .firstName("Менеджер")
-                .lastName("Руководителев")
+            User.builder()
+                .username("supervisor")
+                .password(passwordEncoder.encode("super123"))
+                .email("supervisor@truck-navigator.ru")
+                .firstName("Михаил")
+                .lastName("Супервайзеров")
                 .active(true)
                 .roles(Set.of("ROLE_DISPATCHER", "ROLE_MANAGER"))
                 .createdAt(LocalDateTime.now())
-                .build();
+                .build()
+        );
 
-        // Сохраняем всех пользователей
-        userRepository.saveAll(List.of(admin, dispatcher, driver, multiRole));
-
-        log.info("Создано {} пользователей", 4);
-    }
-
-    /**
-     * Инициализирует тестовые транспортные средства
-     */
-    private void initVehicles() {
-        log.info("Создание тестовых транспортных средств...");
-
-        // КамАЗ тягач
-        Vehicle truck1 = Vehicle.builder()
-                .registrationNumber("А123БВ777")
-                .model("КАМАЗ-5490")
-                .manufacturer("КАМАЗ")
-                .productionYear(2020)
-                .heightCm(380)
-                .widthCm(255)
-                .lengthCm(1680)
-                .emptyWeightKg(7900)
-                .maxLoadCapacityKg(10500)
-                .grossWeightKg(18400)
-                .engineType("DIESEL")
-                .fuelCapacityLitres(400)
-                .fuelConsumptionPer100km(new BigDecimal("33.5"))
-                .emissionClass("EURO_5")
-                .axisConfiguration("4X2")
-                .axisCount(2)
-                .hasRefrigerator(false)
-                .hasDangerousGoodsPermission(false)
-                .hasOversizedCargoPermission(false)
-                .currentFuelLevelLitres(new BigDecimal("320.0"))
-                .currentOdometerKm(new BigDecimal("125000.0"))
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        // Volvo с рефрижератором
-        Vehicle truck2 = Vehicle.builder()
-                .registrationNumber("Е456ВК178")
-                .model("Volvo FH")
-                .manufacturer("Volvo")
-                .productionYear(2021)
-                .heightCm(390)
-                .widthCm(255)
-                .lengthCm(1650)
-                .emptyWeightKg(9000)
-                .maxLoadCapacityKg(11000)
-                .grossWeightKg(20000)
-                .engineType("DIESEL")
-                .fuelCapacityLitres(600)
-                .fuelConsumptionPer100km(new BigDecimal("30.8"))
-                .emissionClass("EURO_6")
-                .axisConfiguration("6X4")
-                .axisCount(3)
-                .hasRefrigerator(true)
-                .hasDangerousGoodsPermission(true)
-                .hasOversizedCargoPermission(false)
-                .currentFuelLevelLitres(new BigDecimal("450.0"))
-                .currentOdometerKm(new BigDecimal("87200.0"))
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        // MAN для негабаритных грузов
-        Vehicle truck3 = Vehicle.builder()
-                .registrationNumber("О789МН750")
-                .model("MAN TGX")
-                .manufacturer("MAN")
-                .productionYear(2019)
-                .heightCm(370)
-                .widthCm(255)
-                .lengthCm(1640)
-                .emptyWeightKg(8500)
-                .maxLoadCapacityKg(10000)
-                .grossWeightKg(18500)
-                .engineType("DIESEL")
-                .fuelCapacityLitres(500)
-                .fuelConsumptionPer100km(new BigDecimal("31.2"))
-                .emissionClass("EURO_5")
-                .axisConfiguration("4X2")
-                .axisCount(2)
-                .hasRefrigerator(false)
-                .hasDangerousGoodsPermission(false)
-                .hasOversizedCargoPermission(true)
-                .currentFuelLevelLitres(new BigDecimal("280.0"))
-                .currentOdometerKm(new BigDecimal("210500.0"))
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        // Scania для опасных грузов
-        Vehicle truck4 = Vehicle.builder()
-                .registrationNumber("Т555УФ116")
-                .model("Scania R500")
-                .manufacturer("Scania")
-                .productionYear(2022)
-                .heightCm(385)
-                .widthCm(250)
-                .lengthCm(1620)
-                .emptyWeightKg(8700)
-                .maxLoadCapacityKg(12000)
-                .grossWeightKg(20700)
-                .engineType("DIESEL")
-                .fuelCapacityLitres(550)
-                .fuelConsumptionPer100km(new BigDecimal("29.5"))
-                .emissionClass("EURO_6")
-                .axisConfiguration("6X4")
-                .axisCount(3)
-                .hasRefrigerator(false)
-                .hasDangerousGoodsPermission(true)
-                .hasOversizedCargoPermission(false)
-                .currentFuelLevelLitres(new BigDecimal("410.0"))
-                .currentOdometerKm(new BigDecimal("45600.0"))
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        // Сохраняем все ТС
-        vehicleRepository.saveAll(List.of(truck1, truck2, truck3, truck4));
-
-        log.info("Создано {} транспортных средств", 4);
+        userRepository.saveAll(users);
     }
 
     /**
      * Инициализирует тестовых водителей
      */
     private void initDrivers() {
-        log.info("Создание тестовых водителей...");
+        log.info("🚛 Создание тестовых водителей...");
 
-        // Водитель с базовыми правами
-        Driver driver1 = Driver.builder()
+        List<Driver> drivers = List.of(
+            Driver.builder()
                 .firstName("Иван")
-                .lastName("Иванов")
-                .middleName("Иванович")
-                .birthDate(LocalDate.of(1985, 5, 15))
-                .licenseNumber("7777 123456")
-                .licenseIssueDate(LocalDate.of(2015, 3, 10))
-                .licenseExpiryDate(LocalDate.of(2025, 3, 10))
-                .licenseCategories("B, C, CE")
-                .phoneNumber("+7 (999) 123-45-67")
-                .email("ivanov@example.com")
-                .drivingExperienceYears(10)
-                .hasDangerousGoodsCertificate(false)
-                .hasInternationalTransportationPermit(false)
-                .hourlyRate(new BigDecimal("300.00"))
-                .perKilometerRate(new BigDecimal("10.00"))
-                .currentDrivingStatus(Driver.DrivingStatus.AVAILABILITY)
-                .currentStatusStartTime(LocalDateTime.now().minusHours(1))
-                .dailyDrivingMinutesToday(180)
-                .continuousDrivingMinutes(0)
-                .weeklyDrivingMinutes(1200)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        // Опытный водитель с международными перевозками
-        Driver driver2 = Driver.builder()
-                .firstName("Петр")
                 .lastName("Петров")
-                .middleName("Петрович")
-                .birthDate(LocalDate.of(1980, 10, 25))
-                .licenseNumber("5555 987654")
-                .licenseIssueDate(LocalDate.of(2010, 7, 20))
-                .licenseExpiryDate(LocalDate.of(2030, 7, 20))
-                .licenseCategories("B, C, CE, D")
-                .phoneNumber("+7 (999) 765-43-21")
-                .email("petrov@example.com")
+                .middleName("Сергеевич")
+                .birthDate(LocalDate.of(1985, 5, 15))
+                .licenseNumber("7722334455")
+                .licenseIssueDate(LocalDate.of(2010, 3, 20))
+                .licenseExpiryDate(LocalDate.of(2030, 3, 20))
+                .licenseCategories("B,C,CE")
+                .phoneNumber("+7-900-123-45-67")
+                .email("ivan.petrov@example.com")
                 .drivingExperienceYears(15)
                 .hasDangerousGoodsCertificate(true)
-                .dangerousGoodsCertificateExpiry(LocalDate.of(2024, 12, 31))
+                .dangerousGoodsCertificateExpiry(LocalDate.of(2025, 6, 1))
                 .hasInternationalTransportationPermit(true)
-                .hourlyRate(new BigDecimal("350.00"))
-                .perKilometerRate(new BigDecimal("12.00"))
-                .currentDrivingStatus(Driver.DrivingStatus.DRIVING)
-                .currentStatusStartTime(LocalDateTime.now().minusMinutes(90))
-                .dailyDrivingMinutesToday(240)
-                .continuousDrivingMinutes(90)
-                .weeklyDrivingMinutes(1500)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+                .hasOversizedCargoPermit(true)
+                .hasRefrigeratedCargoPermit(true)
+                .medicalCertificateNumber("МК-12345")
+                .medicalCertificateExpiryDate(LocalDate.of(2024, 12, 31))
+                .currentDrivingStatus(DrivingStatus.AVAILABILITY)
+                .currentStatusStartTime(LocalDateTime.now().minusHours(2))
+                .dailyDrivingMinutesToday(0)
+                .continuousDrivingMinutes(0)
+                .weeklyDrivingMinutes(0)
+                .avgFuelEfficiencyPercent(95)
+                .avgDeliveryTimeEfficiencyPercent(98)
+                .hourlyRate(new BigDecimal("800.00"))
+                .perKilometerRate(new BigDecimal("15.00"))
+                .rating(new BigDecimal("4.8"))
+                .completedRoutesCount(245)
+                .totalDistanceDrivenKm(new BigDecimal("125000"))
+                .incidentsCount(0)
+                .workScheduleType("5/2")
+                .weeklyWorkHours(40)
+                .lastRestDay(LocalDate.now().minusDays(1))
+                .knownRegions(Set.of("77", "78", "47", "50"))
+                .adrClasses(Set.of("1", "3", "8"))
+                .build(),
 
-        // Водитель на отдыхе
-        Driver driver3 = Driver.builder()
-                .firstName("Сергей")
-                .lastName("Сергеев")
-                .middleName("Сергеевич")
-                .birthDate(LocalDate.of(1990, 2, 8))
-                .licenseNumber("6666 456789")
-                .licenseIssueDate(LocalDate.of(2018, 5, 15))
-                .licenseExpiryDate(LocalDate.of(2028, 5, 15))
-                .licenseCategories("B, C, CE")
-                .phoneNumber("+7 (999) 555-55-55")
-                .email("sergeev@example.com")
-                .drivingExperienceYears(5)
+            Driver.builder()
+                .firstName("Алексей")
+                .lastName("Сидоров")
+                .middleName("Владимирович")
+                .birthDate(LocalDate.of(1978, 11, 8))
+                .licenseNumber("6611224433")
+                .licenseIssueDate(LocalDate.of(2008, 7, 10))
+                .licenseExpiryDate(LocalDate.of(2028, 7, 10))
+                .licenseCategories("B,C,CE,D")
+                .phoneNumber("+7-901-987-65-43")
+                .email("alexey.sidorov@example.com")
+                .drivingExperienceYears(22)
+                .hasDangerousGoodsCertificate(true)
+                .hasInternationalTransportationPermit(true)
+                .hasOversizedCargoPermit(false)
+                .hasRefrigeratedCargoPermit(true)
+                .medicalCertificateNumber("МК-67890")
+                .medicalCertificateExpiryDate(LocalDate.of(2024, 8, 15))
+                .currentDrivingStatus(DrivingStatus.AVAILABILITY)
+                .currentStatusStartTime(LocalDateTime.now().minusHours(1))
+                .dailyDrivingMinutesToday(0)
+                .continuousDrivingMinutes(0)
+                .weeklyDrivingMinutes(0)
+                .avgFuelEfficiencyPercent(92)
+                .avgDeliveryTimeEfficiencyPercent(95)
+                .hourlyRate(new BigDecimal("950.00"))
+                .perKilometerRate(new BigDecimal("18.00"))
+                .rating(new BigDecimal("4.9"))
+                .completedRoutesCount(312)
+                .totalDistanceDrivenKm(new BigDecimal("180000"))
+                .incidentsCount(1)
+                .workScheduleType("2/2")
+                .weeklyWorkHours(48)
+                .lastRestDay(LocalDate.now().minusDays(2))
+                .knownRegions(Set.of("77", "78", "23", "39"))
+                .adrClasses(Set.of("2", "3", "4.1"))
+                .build(),
+
+            Driver.builder()
+                .firstName("Михаил")
+                .lastName("Кузнецов")
+                .middleName("Андреевич")
+                .birthDate(LocalDate.of(1990, 2, 22))
+                .licenseNumber("5544332211")
+                .licenseIssueDate(LocalDate.of(2015, 1, 12))
+                .licenseExpiryDate(LocalDate.of(2035, 1, 12))
+                .licenseCategories("B,C")
+                .phoneNumber("+7-902-555-11-22")
+                .email("mikhail.kuznetsov@example.com")
+                .drivingExperienceYears(9)
                 .hasDangerousGoodsCertificate(false)
                 .hasInternationalTransportationPermit(false)
-                .hourlyRate(new BigDecimal("280.00"))
-                .perKilometerRate(new BigDecimal("9.00"))
-                .currentDrivingStatus(Driver.DrivingStatus.DAILY_REST)
-                .currentStatusStartTime(LocalDateTime.now().minusHours(5))
-                .dailyDrivingMinutesToday(360)
+                .hasOversizedCargoPermit(false)
+                .hasRefrigeratedCargoPermit(false)
+                .medicalCertificateNumber("МК-11111")
+                .medicalCertificateExpiryDate(LocalDate.of(2025, 3, 1))
+                .currentDrivingStatus(DrivingStatus.AVAILABILITY)
+                .currentStatusStartTime(LocalDateTime.now().minusMinutes(30))
+                .dailyDrivingMinutesToday(0)
                 .continuousDrivingMinutes(0)
-                .weeklyDrivingMinutes(1800)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+                .weeklyDrivingMinutes(0)
+                .avgFuelEfficiencyPercent(88)
+                .avgDeliveryTimeEfficiencyPercent(90)
+                .hourlyRate(new BigDecimal("650.00"))
+                .perKilometerRate(new BigDecimal("12.00"))
+                .rating(new BigDecimal("4.5"))
+                .completedRoutesCount(89)
+                .totalDistanceDrivenKm(new BigDecimal("45000"))
+                .incidentsCount(0)
+                .workScheduleType("5/2")
+                .weeklyWorkHours(40)
+                .lastRestDay(LocalDate.now().minusDays(1))
+                .knownRegions(Set.of("77", "50", "33"))
+                .adrClasses(Set.of())
+                .build()
+        );
 
-        // Водитель со сверхурочными часами
-        Driver driver4 = Driver.builder()
-                .firstName("Алексей")
-                .lastName("Алексеев")
-                .middleName("Алексеевич")
-                .birthDate(LocalDate.of(1988, 7, 12))
-                .licenseNumber("1234 567890")
-                .licenseIssueDate(LocalDate.of(2012, 8, 25))
-                .licenseExpiryDate(LocalDate.of(2027, 8, 25))
-                .licenseCategories("B, C, CE")
-                .phoneNumber("+7 (999) 111-22-33")
-                .email("alekseev@example.com")
-                .drivingExperienceYears(8)
-                .hasDangerousGoodsCertificate(true)
-                .dangerousGoodsCertificateExpiry(LocalDate.of(2025, 6, 15))
-                .hasInternationalTransportationPermit(true)
-                .hourlyRate(new BigDecimal("320.00"))
-                .perKilometerRate(new BigDecimal("11.00"))
-                .currentDrivingStatus(Driver.DrivingStatus.DRIVING)
-                .currentStatusStartTime(LocalDateTime.now().minusHours(4))
-                .dailyDrivingMinutesToday(400)
-                .continuousDrivingMinutes(240)
-                .weeklyDrivingMinutes(2500)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+        driverRepository.saveAll(drivers);
+    }
 
-        // Сохраняем всех водителей
-        driverRepository.saveAll(List.of(driver1, driver2, driver3, driver4));
+    /**
+     * Инициализирует тестовые транспортные средства
+     */
+    private void initVehicles() {
+        log.info("🚚 Создание тестовых транспортных средств...");
 
-        log.info("Создано {} водителей", 4);
+        List<Vehicle> vehicles = List.of(
+            Vehicle.builder()
+                .registrationNumber("А123ВС77")
+                .manufacturer("КАМАЗ")
+                .model("65116")
+                .productionYear(2020)
+                .heightCm(320)
+                .widthCm(250)
+                .lengthCm(850)
+                .emptyWeightKg(10000)
+                .maxLoadCapacityKg(15000)
+                .grossWeightKg(25000)
+                .engineType("DIESEL")
+                .fuelCapacityLitres(350)
+                .fuelConsumptionPer100km(new BigDecimal("32.5"))
+                .emissionClass("EURO_5")
+                .axisConfiguration("6X4")
+                .axisCount(3)
+                .hasRefrigerator(false)
+                .hasDangerousGoodsPermission(true)
+                .hasOversizedCargoPermission(false)
+                .currentFuelLevelLitres(new BigDecimal("280"))
+                .currentOdometerKm(new BigDecimal("85000"))
+                .lastMaintenanceDate(LocalDate.of(2024, 1, 15))
+                .nextMaintenanceDate(LocalDate.of(2024, 7, 15))
+                .maintenanceIntervalKm(10000)
+                .avgSpeedKmh(65.0)
+                .avgIdleTimePercent(15.0)
+                .actualFuelConsumptionPer100km(new BigDecimal("34.2"))
+                .adrCertificateNumber("ADR-123456")
+                .adrCertificateExpiryDate(LocalDate.of(2025, 12, 31))
+                .avgMaintenanceCostPerKm(new BigDecimal("2.50"))
+                .vehicleDepreciationPerKm(new BigDecimal("8.00"))
+                .build(),
+
+            Vehicle.builder()
+                .registrationNumber("В456ТР99")
+                .manufacturer("МАН")
+                .model("TGX 18.440")
+                .productionYear(2019)
+                .heightCm(400)
+                .widthCm(255)
+                .lengthCm(1650)
+                .emptyWeightKg(12000)
+                .maxLoadCapacityKg(18000)
+                .grossWeightKg(40000)
+                .engineType("DIESEL")
+                .fuelCapacityLitres(400)
+                .fuelConsumptionPer100km(new BigDecimal("28.0"))
+                .emissionClass("EURO_6")
+                .axisConfiguration("6X4")
+                .axisCount(3)
+                .hasRefrigerator(true)
+                .hasDangerousGoodsPermission(false)
+                .hasOversizedCargoPermission(false)
+                .currentFuelLevelLitres(new BigDecimal("320"))
+                .currentOdometerKm(new BigDecimal("120000"))
+                .lastMaintenanceDate(LocalDate.of(2023, 12, 10))
+                .nextMaintenanceDate(LocalDate.of(2024, 6, 10))
+                .maintenanceIntervalKm(15000)
+                .avgSpeedKmh(70.0)
+                .avgIdleTimePercent(20.0)
+                .actualFuelConsumptionPer100km(new BigDecimal("29.5"))
+                .avgMaintenanceCostPerKm(new BigDecimal("3.20"))
+                .vehicleDepreciationPerKm(new BigDecimal("12.00"))
+                .build(),
+
+            Vehicle.builder()
+                .registrationNumber("Е789УК50")
+                .manufacturer("Volvo")
+                .model("FH16")
+                .productionYear(2021)
+                .heightCm(400)
+                .widthCm(255)
+                .lengthCm(1650)
+                .emptyWeightKg(14000)
+                .maxLoadCapacityKg(20000)
+                .grossWeightKg(44000)
+                .engineType("DIESEL")
+                .fuelCapacityLitres(450)
+                .fuelConsumptionPer100km(new BigDecimal("30.0"))
+                .emissionClass("EURO_6")
+                .axisConfiguration("8X4")
+                .axisCount(4)
+                .hasRefrigerator(false)
+                .hasDangerousGoodsPermission(false)
+                .hasOversizedCargoPermission(true)
+                .currentFuelLevelLitres(new BigDecimal("380"))
+                .currentOdometerKm(new BigDecimal("45000"))
+                .lastMaintenanceDate(LocalDate.of(2024, 2, 1))
+                .nextMaintenanceDate(LocalDate.of(2024, 8, 1))
+                .maintenanceIntervalKm(20000)
+                .avgSpeedKmh(68.0)
+                .avgIdleTimePercent(12.0)
+                .actualFuelConsumptionPer100km(new BigDecimal("31.2"))
+                .avgMaintenanceCostPerKm(new BigDecimal("4.00"))
+                .vehicleDepreciationPerKm(new BigDecimal("15.00"))
+                .build()
+        );
+
+        vehicleRepository.saveAll(vehicles);
     }
 
     /**
      * Инициализирует тестовые грузы
      */
     private void initCargos() {
-        log.info("Создание тестовых грузов...");
+        log.info("📦 Создание тестовых грузов...");
 
-        // Бытовая техника (генеральный груз)
-        Cargo cargo1 = Cargo.builder()
-                .name("Бытовая техника")
-                .description("Холодильники, стиральные машины, телевизоры")
-                .weightKg(5000)
-                .volumeCubicMeters(new BigDecimal("30.0"))
-                .lengthCm(600)
-                .widthCm(240)
-                .heightCm(220)
+        List<Cargo> cargos = List.of(
+            Cargo.builder()
+                .name("Строительные материалы")
+                .description("Кирпич силикатный, поддоны")
+                .weightKg(8500)
+                .volumeCubicMeters(new BigDecimal("25.0"))
+                .lengthCm(400)
+                .widthCm(200)
+                .heightCm(150)
                 .cargoType(Cargo.CargoType.GENERAL)
-                .isFragile(true)
+                .isFragile(false)
                 .isPerishable(false)
                 .isDangerous(false)
-                .isOversized(false)
                 .requiresTemperatureControl(false)
                 .requiresCustomsClearance(false)
-                .declaredValue(new BigDecimal("2000000.00"))
+                .declaredValue(new BigDecimal("450000"))
                 .currency("RUB")
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+                .build(),
 
-        // Замороженные продукты (рефрижераторный груз)
-        Cargo cargo2 = Cargo.builder()
-                .name("Продукты питания")
-                .description("Замороженные полуфабрикаты, мясо, рыба")
-                .weightKg(8000)
-                .volumeCubicMeters(new BigDecimal("25.0"))
-                .lengthCm(550)
+            Cargo.builder()
+                .name("Замороженные продукты")
+                .description("Мясная продукция, полуфабрикаты")
+                .weightKg(12000)
+                .volumeCubicMeters(new BigDecimal("35.0"))
+                .lengthCm(600)
                 .widthCm(240)
-                .heightCm(220)
+                .heightCm(200)
                 .cargoType(Cargo.CargoType.REFRIGERATED)
                 .isFragile(false)
                 .isPerishable(true)
                 .isDangerous(false)
-                .isOversized(false)
                 .requiresTemperatureControl(true)
                 .minTemperatureCelsius(-18)
-                .maxTemperatureCelsius(-10)
+                .maxTemperatureCelsius(-15)
                 .requiresCustomsClearance(false)
-                .declaredValue(new BigDecimal("1500000.00"))
+                .declaredValue(new BigDecimal("1200000"))
                 .currency("RUB")
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+                .build(),
 
-        // Опасный груз
-        Cargo cargo3 = Cargo.builder()
-                .name("Химическая продукция")
-                .description("Неорганические кислоты, класс опасности 8")
-                .weightKg(6000)
-                .volumeCubicMeters(new BigDecimal("20.0"))
-                .lengthCm(500)
+            Cargo.builder()
+                .name("Бытовая техника")
+                .description("Холодильники, стиральные машины")
+                .weightKg(6500)
+                .volumeCubicMeters(new BigDecimal("40.0"))
+                .lengthCm(800)
                 .widthCm(240)
-                .heightCm(200)
+                .heightCm(220)
+                .cargoType(Cargo.CargoType.FRAGILE)
+                .isFragile(true)
+                .isPerishable(false)
+                .isDangerous(false)
+                .requiresTemperatureControl(false)
+                .requiresCustomsClearance(false)
+                .declaredValue(new BigDecimal("850000"))
+                .currency("RUB")
+                .build(),
+
+            Cargo.builder()
+                .name("Химические реактивы")
+                .description("Промышленная химия класса 8")
+                .weightKg(5000)
+                .volumeCubicMeters(new BigDecimal("15.0"))
+                .lengthCm(300)
+                .widthCm(200)
+                .heightCm(180)
                 .cargoType(Cargo.CargoType.DANGEROUS)
                 .isFragile(false)
                 .isPerishable(false)
                 .isDangerous(true)
                 .dangerousGoodsClass("8")
-                .unNumber("UN1830")
-                .isOversized(false)
+                .unNumber("UN1760")
                 .requiresTemperatureControl(false)
                 .requiresCustomsClearance(true)
-                .declaredValue(new BigDecimal("1200000.00"))
+                .declaredValue(new BigDecimal("320000"))
                 .currency("RUB")
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+                .build(),
 
-        // Негабаритный груз
-        Cargo cargo4 = Cargo.builder()
-                .name("Строительное оборудование")
-                .description("Бетономешалка, экскаватор малый")
-                .weightKg(12000)
-                .volumeCubicMeters(new BigDecimal("40.0"))
-                .lengthCm(750)
-                .widthCm(260)
-                .heightCm(280)
-                .cargoType(Cargo.CargoType.OVERSIZED)
+            Cargo.builder()
+                .name("Автомобильные запчасти")
+                .description("Двигатели, КПП, запчасти")
+                .weightKg(15000)
+                .volumeCubicMeters(new BigDecimal("50.0"))
+                .lengthCm(1000)
+                .widthCm(240)
+                .heightCm(250)
+                .cargoType(Cargo.CargoType.HEAVY)
                 .isFragile(false)
                 .isPerishable(false)
                 .isDangerous(false)
                 .isOversized(true)
                 .requiresTemperatureControl(false)
                 .requiresCustomsClearance(false)
-                .declaredValue(new BigDecimal("5000000.00"))
+                .declaredValue(new BigDecimal("2500000"))
                 .currency("RUB")
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+                .build()
+        );
 
-        // Ценный груз
-        Cargo cargo5 = Cargo.builder()
-                .name("Электроника")
-                .description("Смартфоны, ноутбуки, комплектующие")
-                .weightKg(3000)
-                .volumeCubicMeters(new BigDecimal("15.0"))
-                .lengthCm(400)
-                .widthCm(220)
-                .heightCm(180)
-                .cargoType(Cargo.CargoType.VALUABLE)
-                .isFragile(true)
-                .isPerishable(false)
-                .isDangerous(false)
-                .isOversized(false)
-                .requiresTemperatureControl(false)
-                .requiresCustomsClearance(true)
-                .declaredValue(new BigDecimal("8000000.00"))
-                .currency("RUB")
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        // Сохраняем все грузы
-        cargoRepository.saveAll(List.of(cargo1, cargo2, cargo3, cargo4, cargo5));
-
-        log.info("Создано {} грузов", 5);
+        cargoRepository.saveAll(cargos);
     }
 
     /**
-     * Инициализирует тестовые маршруты с промежуточными точками
+     * Инициализирует тестовые маршруты
      */
     private void initRoutes() {
-        log.info("Создание тестовых маршрутов...");
+        log.info("🗺️ Создание тестовых маршрутов...");
 
-        // Получаем сохраненные сущности
-        List<Vehicle> vehicles = vehicleRepository.findAll();
-        List<Driver> drivers = driverRepository.findAll();
-        List<Cargo> cargos = cargoRepository.findAll();
+        try {
+            List<Route> routes = List.of(
+                Route.builder()
+                    .name("Москва - Санкт-Петербург")
+                    .startAddress("Москва, МКАД 47км")
+                    .startLat(55.7558)
+                    .startLon(37.6176)
+                    .endAddress("Санкт-Петербург, КАД 23км")
+                    .endLat(59.9311)
+                    .endLon(30.3609)
+                    .distanceKm(new BigDecimal("635"))
+                    .estimatedDurationMinutes(480)
+                    .estimatedFuelConsumption(new BigDecimal("206.75"))
+                    .estimatedFuelCost(new BigDecimal("11337"))
+                    .estimatedTollCost(new BigDecimal("1200"))
+                    .estimatedDriverCost(new BigDecimal("6400"))
+                    .estimatedTotalCost(new BigDecimal("18937"))
+                    .currency("RUB")
+                    .overallRiskScore(new BigDecimal("32"))
+                    .weatherRiskScore(new BigDecimal("25"))
+                    .roadQualityRiskScore(new BigDecimal("15"))
+                    .trafficRiskScore(new BigDecimal("40"))
+                    .cargoRiskScore(new BigDecimal("20"))
+                    .status(Route.RouteStatus.PLANNED)
+                    .departureTime(LocalDateTime.now().plusHours(2))
+                    .estimatedArrivalTime(LocalDateTime.now().plusHours(10))
+                    .build(),
 
-        if (vehicles.isEmpty() || drivers.isEmpty() || cargos.isEmpty()) {
-            log.warn("Невозможно создать маршруты: отсутствуют ТС, водители или грузы");
-            return;
+                Route.builder()
+                    .name("Москва - Казань")
+                    .startAddress("Москва, Щелковское шоссе")
+                    .startLat(55.7558)
+                    .startLon(37.6176)
+                    .endAddress("Казань, автовокзал")
+                    .endLat(55.8304)
+                    .endLon(49.0661)
+                    .distanceKm(new BigDecimal("815"))
+                    .estimatedDurationMinutes(600)
+                    .estimatedFuelConsumption(new BigDecimal("264.88"))
+                    .estimatedFuelCost(new BigDecimal("14518"))
+                    .estimatedTollCost(new BigDecimal("800"))
+                    .estimatedDriverCost(new BigDecimal("8000"))
+                    .estimatedTotalCost(new BigDecimal("23318"))
+                    .currency("RUB")
+                    .overallRiskScore(new BigDecimal("28"))
+                    .weatherRiskScore(new BigDecimal("30"))
+                    .roadQualityRiskScore(new BigDecimal("20"))
+                    .trafficRiskScore(new BigDecimal("25"))
+                    .cargoRiskScore(new BigDecimal("35"))
+                    .status(Route.RouteStatus.PLANNED)
+                    .departureTime(LocalDateTime.now().plusDays(1))
+                    .estimatedArrivalTime(LocalDateTime.now().plusDays(1).plusHours(10))
+                    .build(),
+
+                Route.builder()
+                    .name("Санкт-Петербург - Новгород")
+                    .startAddress("Санкт-Петербург, КАД 12км")
+                    .startLat(59.9311)
+                    .startLon(30.3609)
+                    .endAddress("Великий Новгород, ТЦ Русь")
+                    .endLat(58.5219)
+                    .endLon(31.2756)
+                    .distanceKm(new BigDecimal("190"))
+                    .estimatedDurationMinutes(150)
+                    .estimatedFuelConsumption(new BigDecimal("61.75"))
+                    .estimatedFuelCost(new BigDecimal("3386"))
+                    .estimatedTollCost(new BigDecimal("0"))
+                    .estimatedDriverCost(new BigDecimal("2000"))
+                    .estimatedTotalCost(new BigDecimal("5386"))
+                    .currency("RUB")
+                    .overallRiskScore(new BigDecimal("21"))
+                    .weatherRiskScore(new BigDecimal("20"))
+                    .roadQualityRiskScore(new BigDecimal("25"))
+                    .trafficRiskScore(new BigDecimal("15"))
+                    .cargoRiskScore(new BigDecimal("25"))
+                    .status(Route.RouteStatus.PLANNED)
+                    .departureTime(LocalDateTime.now().plusDays(2))
+                    .estimatedArrivalTime(LocalDateTime.now().plusDays(2).plusHours(3))
+                    .build()
+            );
+
+            routeRepository.saveAll(routes);
+        } catch (Exception e) {
+            log.warn("⚠️ Не удалось создать тестовые маршруты: {}", e.getMessage());
+            // Продолжаем выполнение, маршруты не критичны для базовой функциональности
         }
-
-        // Маршрут 1: Москва - Санкт-Петербург
-        Route route1 = Route.builder()
-                .name("Москва - Санкт-Петербург")
-                .startAddress("Москва, Складочная ул., 1")
-                .startLat(55.8003)
-                .startLon(37.5917)
-                .endAddress("Санкт-Петербург, Софийская ул., 145")
-                .endLat(59.8325)
-                .endLon(30.3991)
-                .distanceKm(new BigDecimal("705.5"))
-                .estimatedDurationMinutes(510) // 8.5 часов
-                .vehicle(vehicles.get(0))
-                .driver(drivers.get(0))
-                .cargo(cargos.get(0))
-                .departureTime(LocalDateTime.now().plusDays(1).withHour(8).withMinute(0))
-                .estimatedArrivalTime(LocalDateTime.now().plusDays(1).withHour(16).withMinute(30))
-                .estimatedFuelConsumption(new BigDecimal("235.2"))
-                .estimatedFuelCost(new BigDecimal("15288.00"))
-                .estimatedTollCost(new BigDecimal("1300.00"))
-                .estimatedDriverCost(new BigDecimal("7055.00"))
-                .estimatedTotalCost(new BigDecimal("23643.00"))
-                .weatherRiskScore(new BigDecimal("15.5"))
-                .roadQualityRiskScore(new BigDecimal("20.0"))
-                .trafficRiskScore(new BigDecimal("30.0"))
-                .overallRiskScore(new BigDecimal("22.8"))
-                .status(Route.RouteStatus.PLANNED)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        // Добавляем промежуточные точки для маршрута 1
-        List<Waypoint> waypoints1 = Arrays.asList(
-                Waypoint.builder()
-                        .route(route1)
-                        .orderIndex(1)
-                        .name("Заправка и отдых")
-                        .address("Тверь, АЗС Лукойл на M-10")
-                        .latitude(56.8584)
-                        .longitude(35.9043)
-                        .waypointType(Waypoint.WaypointType.FUEL)
-                        .plannedArrivalTime(LocalDateTime.now().plusDays(1).withHour(10).withMinute(30))
-                        .plannedDepartureTime(LocalDateTime.now().plusDays(1).withHour(11).withMinute(0))
-                        .stayDurationMinutes(30)
-                        .createdAt(LocalDateTime.now())
-                        .updatedAt(LocalDateTime.now())
-                        .build(),
-                Waypoint.builder()
-                        .route(route1)
-                        .orderIndex(2)
-                        .name("Обеденный перерыв")
-                        .address("Великий Новгород, ул. Ломоносова, 20")
-                        .latitude(58.5223)
-                        .longitude(31.2831)
-                        .waypointType(Waypoint.WaypointType.REST)
-                        .plannedArrivalTime(LocalDateTime.now().plusDays(1).withHour(13).withMinute(30))
-                        .plannedDepartureTime(LocalDateTime.now().plusDays(1).withHour(14).withMinute(15))
-                        .stayDurationMinutes(45)
-                        .createdAt(LocalDateTime.now())
-                        .updatedAt(LocalDateTime.now())
-                        .build()
-        );
-
-        route1.setWaypoints(waypoints1);
-
-        // Маршрут 2: Санкт-Петербург - Калининград
-        Route route2 = Route.builder()
-                .name("Санкт-Петербург - Калининград")
-                .startAddress("Санкт-Петербург, Пулковское шоссе, 42")
-                .startLat(59.7908)
-                .startLon(30.3335)
-                .endAddress("Калининград, Индустриальная ул., 4")
-                .endLat(54.7064)
-                .endLon(20.5121)
-                .distanceKm(new BigDecimal("952.3"))
-                .estimatedDurationMinutes(720) // 12 часов
-                .vehicle(vehicles.get(1))
-                .driver(drivers.get(1))
-                .cargo(cargos.get(1))
-                .departureTime(LocalDateTime.now().plusDays(2).withHour(6).withMinute(0))
-                .estimatedArrivalTime(LocalDateTime.now().plusDays(2).withHour(18).withMinute(0))
-                .estimatedFuelConsumption(new BigDecimal("293.3"))
-                .estimatedFuelCost(new BigDecimal("19064.5"))
-                .estimatedTollCost(new BigDecimal("2400.00"))
-                .estimatedDriverCost(new BigDecimal("11427.6"))
-                .estimatedTotalCost(new BigDecimal("32892.1"))
-                .weatherRiskScore(new BigDecimal("35.2"))
-                .roadQualityRiskScore(new BigDecimal("25.5"))
-                .trafficRiskScore(new BigDecimal("15.0"))
-                .overallRiskScore(new BigDecimal("26.2"))
-                .status(Route.RouteStatus.DRAFT)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        // Промежуточные точки для маршрута 2
-        List<Waypoint> waypoints2 = Arrays.asList(
-                Waypoint.builder()
-                        .route(route2)
-                        .orderIndex(1)
-                        .name("Таможенный пункт")
-                        .address("Граница РФ-Латвия, п. Шумилкино")
-                        .latitude(57.8735)
-                        .longitude(27.3388)
-                        .waypointType(Waypoint.WaypointType.CUSTOMS)
-                        .plannedArrivalTime(LocalDateTime.now().plusDays(2).withHour(10).withMinute(0))
-                        .plannedDepartureTime(LocalDateTime.now().plusDays(2).withHour(11).withMinute(30))
-                        .stayDurationMinutes(90)
-                        .createdAt(LocalDateTime.now())
-                        .updatedAt(LocalDateTime.now())
-                        .build(),
-                Waypoint.builder()
-                        .route(route2)
-                        .orderIndex(2)
-                        .name("Обязательный отдых")
-                        .address("Рига, Логистический центр")
-                        .latitude(56.9460)
-                        .longitude(24.1059)
-                        .waypointType(Waypoint.WaypointType.REST)
-                        .plannedArrivalTime(LocalDateTime.now().plusDays(2).withHour(14).withMinute(0))
-                        .plannedDepartureTime(LocalDateTime.now().plusDays(2).withHour(15).withMinute(0))
-                        .stayDurationMinutes(60)
-                        .createdAt(LocalDateTime.now())
-                        .updatedAt(LocalDateTime.now())
-                        .build(),
-                Waypoint.builder()
-                        .route(route2)
-                        .orderIndex(3)
-                        .name("Пересечение границы ЕС - Калининградская область")
-                        .address("Пограничный переход Советск")
-                        .latitude(55.0852)
-                        .longitude(21.8834)
-                        .waypointType(Waypoint.WaypointType.CUSTOMS)
-                        .plannedArrivalTime(LocalDateTime.now().plusDays(2).withHour(16).withMinute(30))
-                        .plannedDepartureTime(LocalDateTime.now().plusDays(2).withHour(17).withMinute(15))
-                        .stayDurationMinutes(45)
-                        .createdAt(LocalDateTime.now())
-                        .updatedAt(LocalDateTime.now())
-                        .build()
-        );
-
-        route2.setWaypoints(waypoints2);
-
-        // Маршрут 3: Казань - Новосибирск (длинный маршрут с негабаритным грузом)
-        Route route3 = Route.builder()
-                .name("Казань - Новосибирск (Негабаритный груз)")
-                .startAddress("Казань, ул. Техническая, 17")
-                .startLat(55.7671)
-                .startLon(49.0967)
-                .endAddress("Новосибирск, ул. Петухова, 55")
-                .endLat(55.0415)
-                .endLon(82.8981)
-                .distanceKm(new BigDecimal("2384.6"))
-                .estimatedDurationMinutes(2160) // 36 часов (3 дня по 12 часов)
-                .vehicle(vehicles.get(2))
-                .driver(drivers.get(2))
-                .cargo(cargos.get(3)) // негабаритный груз
-                .departureTime(LocalDateTime.now().plusDays(3).withHour(6).withMinute(0))
-                .estimatedArrivalTime(LocalDateTime.now().plusDays(6).withHour(18).withMinute(0))
-                .estimatedFuelConsumption(new BigDecimal("743.9"))
-                .estimatedFuelCost(new BigDecimal("48353.5"))
-                .estimatedTollCost(new BigDecimal("0.00")) // нет платных дорог
-                .estimatedDriverCost(new BigDecimal("21461.4"))
-                .estimatedTotalCost(new BigDecimal("69814.9"))
-                .weatherRiskScore(new BigDecimal("55.3"))
-                .roadQualityRiskScore(new BigDecimal("65.7"))
-                .trafficRiskScore(new BigDecimal("20.0"))
-                .overallRiskScore(new BigDecimal("48.7"))
-                .status(Route.RouteStatus.PLANNED)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        // Маршрут 4: Москва - Ростов-на-Дону (опасный груз)
-        Route route4 = Route.builder()
-                .name("Москва - Ростов-на-Дону (Опасный груз)")
-                .startAddress("Москва, МКАД, 84-й километр")
-                .startLat(55.9129)
-                .startLon(37.5430)
-                .endAddress("Ростов-на-Дону, ул. Доватора, 154")
-                .endLat(47.2724)
-                .endLon(39.6913)
-                .distanceKm(new BigDecimal("1057.8"))
-                .estimatedDurationMinutes(840) // 14 часов
-                .vehicle(vehicles.get(3))
-                .driver(drivers.get(1)) // опытный водитель с допуском на опасные грузы
-                .cargo(cargos.get(2)) // опасный груз
-                .departureTime(LocalDateTime.now().plusDays(4).withHour(5).withMinute(0))
-                .estimatedArrivalTime(LocalDateTime.now().plusDays(4).withHour(19).withMinute(0))
-                .estimatedFuelConsumption(new BigDecimal("312.1"))
-                .estimatedFuelCost(new BigDecimal("20286.5"))
-                .estimatedTollCost(new BigDecimal("1850.00"))
-                .estimatedDriverCost(new BigDecimal("12693.6"))
-                .estimatedTotalCost(new BigDecimal("34830.1"))
-                .weatherRiskScore(new BigDecimal("25.0"))
-                .roadQualityRiskScore(new BigDecimal("30.0"))
-                .trafficRiskScore(new BigDecimal("35.0"))
-                .overallRiskScore(new BigDecimal("30.0"))
-                .status(Route.RouteStatus.DRAFT)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        // Сохраняем все маршруты вместе с промежуточными точками
-        List<Route> routes = routeRepository.saveAll(List.of(route1, route2, route3, route4));
-
-        log.info("Создано {} маршрутов", routes.size());
     }
-}
+
+    /**
+     * Выводит инструкции для тестирования через Swagger
+     */
+    private void logTestingInstructions() {
+        log.info("📖 ========== ИНСТРУКЦИИ ПО ТЕСТИРОВАНИЮ ==========");
+        log.info("🌐 Swagger UI: http://localhost:8080/swagger-ui.html");
+        log.info("🔐 Учетные данные для авторизации:");
+        log.info("   admin/admin123 - полные права");
+        log.info("   dispatcher/disp123 - управление операциями");
+        log.info("   manager/manager123 - аналитика");
+        log.info("   driver/driver123 - водитель");
+        log.info("   supervisor/super123 - супервайзер");
+        log.info("🧪 Тестовые данные созданы:");
+        log.info("   Пользователи: {}", userRepository.count());
+        log.info("   Водители: {}", driverRepository.count());
+        log.info("   ТС: {}", vehicleRepository.count());
+        log.info("   Грузы: {}", cargoRepository.count());
+        log.info("   Маршруты: {}", routeRepository.count());
+        log.info("🗺️  Основные endpoint'ы для тестирования:");
+        log.info("   POST /api/routes/calculate - расчет с полной аналитикой");
+        log.info("   GET /api/routes/plan - планирование по координатам");
+        log.info("   GET /api/routes/plan-by-name - планирование по названиям");
+        log.info("   GET /api/drivers - список водителей");
+        log.info("   GET /api/vehicles - список ТС");
+        log.info("   GET /api/cargos - список грузов");
+        log.info("   GET /api/routes - список маршрутов");
+        log.info("📋 Пример запроса для /api/routes/calculate:");
+        log.info("   {{\"vehicleId\": 1, \"driverId\": 1, \"cargoId\": 1,");
+        log.info("     \"startLat\": 55.7558, \"startLon\": 37.6176,");
+        log.info("     \"endLat\": 59.9311, \"endLon\": 30.3609}}");
+        log.info("==================================================");
+    }
+} 

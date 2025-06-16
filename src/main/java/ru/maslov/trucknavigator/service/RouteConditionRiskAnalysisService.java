@@ -96,6 +96,9 @@ public class    RouteConditionRiskAnalysisService {
 
                 // Если прогноз получен успешно, используем его данные для более точного анализа
                 if (weatherForecast != null && !weatherForecast.getPointForecasts().isEmpty()) {
+                    log.debug("Получен детальный прогноз погоды для {} точек маршрута", 
+                            weatherForecast.getPointForecasts().size());
+                    
                     processDetailedWeatherForecast(route, weatherForecast, weatherAlerts);
 
                     // Суммируем оценки рисков из всех сегментов для расчета среднего
@@ -117,12 +120,34 @@ public class    RouteConditionRiskAnalysisService {
             }
         }
 
-        // Базовый анализ погоды (существующий код)
-        List<double[]> coordinates = route.getCoordinates();
-        int numSegments = Math.min(5, coordinates.size() / 10);
-        numSegments = Math.max(1, numSegments);
+        // Базовый анализ погоды
+        log.debug("Выполняется базовый анализ погодных рисков для маршрута");
+        performBasicWeatherAnalysis(route, weatherAlerts);
 
+        // Устанавливаем результат анализа
+        totalWeatherRiskScore = weatherAlerts.stream()
+                .mapToDouble(segment -> segment.getRiskScore().doubleValue())
+                .sum();
+        segmentsCount = weatherAlerts.size();
+        
+        setWeatherRiskScore(route, weatherAlerts, totalWeatherRiskScore, segmentsCount);
+    }
+
+    /**
+     * Выполняет базовый анализ погодных условий
+     */
+    private void performBasicWeatherAnalysis(RouteResponseDto route, 
+                                           List<RouteResponseDto.WeatherAlertSegment> weatherAlerts) {
+        List<double[]> coordinates = route.getCoordinates();
+        if (coordinates == null || coordinates.isEmpty()) {
+            log.warn("Маршрут не содержит координат для анализа погоды");
+            return;
+        }
+
+        int numSegments = Math.min(5, Math.max(1, coordinates.size() / 10));
         int pointsPerSegment = coordinates.size() / numSegments;
+
+        log.debug("Анализируем погоду для {} сегментов маршрута", numSegments);
 
         for (int i = 0; i < numSegments; i++) {
             int startIndex = i * pointsPerSegment;
@@ -130,51 +155,52 @@ public class    RouteConditionRiskAnalysisService {
 
             // Получаем координаты середины сегмента для запроса погоды
             int midPointIndex = startIndex + (endIndex - startIndex) / 2;
-            if (midPointIndex < coordinates.size()) {
-                double[] midPoint = coordinates.get(midPointIndex);
-                double lat = midPoint[1]; // Порядок в массиве [lon, lat]
-                double lon = midPoint[0];
+            if (midPointIndex >= coordinates.size()) {
+                continue;
+            }
 
-                try {
-                    // Получаем текущую погоду для координат
-                    WeatherDataDto weatherData = weatherService.getCurrentWeather(lat, lon);
+            double[] midPoint = coordinates.get(midPointIndex);
+            double lat = midPoint[1]; // Порядок в массиве [lon, lat]
+            double lon = midPoint[0];
 
-                    // Оцениваем риск
-                    String riskLevel = weatherData.calculateRiskLevel();
-                    String riskDescription = weatherData.generateRiskDescription();
-                    Integer riskScore = weatherData.getRiskScore();
+            try {
+                // Получаем текущую погоду для координат
+                WeatherDataDto weatherData = weatherService.getCurrentWeather(lat, lon);
 
-                    if (riskScore > 0) {
-                        // Добавляем сегмент с погодным предупреждением, если есть риск
-                        RouteResponseDto.WeatherAlertSegment alert = new RouteResponseDto.WeatherAlertSegment();
-                        alert.setStartIndex(startIndex);
-                        alert.setEndIndex(endIndex);
+                // Оцениваем риск
+                String riskLevel = weatherData.calculateRiskLevel();
+                String riskDescription = weatherData.generateRiskDescription();
+                Integer riskScore = weatherData.getRiskScore();
 
-                        // Рассчитываем расстояние сегмента
-                        BigDecimal segmentDistance = calculateSegmentDistance(route.getDistance(), startIndex, endIndex, coordinates.size());
-                        alert.setDistance(segmentDistance);
+                if (riskScore != null && riskScore > 10) { // Учитываем только значимые риски
+                    // Добавляем сегмент с погодным предупреждением
+                    RouteResponseDto.WeatherAlertSegment alert = new RouteResponseDto.WeatherAlertSegment();
+                    alert.setStartIndex(startIndex);
+                    alert.setEndIndex(endIndex);
 
-                        // Устанавливаем тип погодного явления
-                        alert.setWeatherType(weatherData.getWeatherMain() != null ?
-                                weatherData.getWeatherMain().toUpperCase() : "UNKNOWN");
+                    // Рассчитываем расстояние сегмента
+                    BigDecimal segmentDistance = calculateSegmentDistance(
+                            route.getDistance(), startIndex, endIndex, coordinates.size());
+                    alert.setDistance(segmentDistance);
 
-                        alert.setSeverity(riskLevel);
-                        alert.setDescription(riskDescription);
-                        alert.setRiskScore(BigDecimal.valueOf(riskScore));
+                    // Устанавливаем тип погодного явления
+                    alert.setWeatherType(weatherData.getWeatherMain() != null ?
+                            weatherData.getWeatherMain().toUpperCase() : "UNKNOWN");
 
-                        weatherAlerts.add(alert);
+                    alert.setSeverity(riskLevel);
+                    alert.setDescription(riskDescription);
+                    alert.setRiskScore(BigDecimal.valueOf(riskScore));
 
-                        totalWeatherRiskScore += riskScore;
-                        segmentsCount++;
-                    }
-                } catch (Exception e) {
-                    log.error("Ошибка при получении данных о погоде для сегмента {}: {}", i, e.getMessage());
+                    weatherAlerts.add(alert);
+                    
+                    log.debug("Добавлено погодное предупреждение для сегмента {}: {} (риск: {})", 
+                            i, riskDescription, riskScore);
                 }
+            } catch (Exception e) {
+                log.error("Ошибка при получении данных о погоде для сегмента {}: {}", i, e.getMessage());
+                // Продолжаем анализ остальных сегментов
             }
         }
-
-        // Устанавливаем результат анализа
-        setWeatherRiskScore(route, weatherAlerts, totalWeatherRiskScore, segmentsCount);
     }
 
     /**

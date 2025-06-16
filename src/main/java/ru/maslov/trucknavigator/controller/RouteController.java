@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,8 +14,6 @@ import ru.maslov.trucknavigator.dto.compliance.ComplianceResultDto;
 import ru.maslov.trucknavigator.dto.geocoding.GeoLocationDto;
 import ru.maslov.trucknavigator.dto.geocoding.GeoPoint;
 import ru.maslov.trucknavigator.dto.routing.*;
-import ru.maslov.trucknavigator.dto.weather.RouteWeatherForecastDto;
-import ru.maslov.trucknavigator.dto.weather.WeatherHazardWarningDto;
 import ru.maslov.trucknavigator.entity.Cargo;
 import ru.maslov.trucknavigator.entity.Driver;
 import ru.maslov.trucknavigator.entity.Vehicle;
@@ -53,39 +50,19 @@ public class RouteController {
     private final RouteConditionRiskAnalysisService riskAnalysisService;
     private final ProfitabilityService profitabilityService;
     private final ComplianceService complianceService;
-    private final RouteWeatherService routeWeatherService;
 
     /**
      * Получение списка всех маршрутов.
-     *
-     * @return список маршрутов в виде DTO
      */
     @GetMapping
     @Operation(summary = "Получить все маршруты", description = "Возвращает список всех маршрутов")
     public ResponseEntity<List<RouteSummaryDto>> getAllRoutes() {
-        // Используем метод сервиса, возвращающий DTO вместо сущностей
         return ResponseEntity.ok(routeService.findAllSummaries());
     }
 
     /**
-     * Получение маршрута по ID.
-     *
-     * @param id идентификатор маршрута
-     * @return детальная информация о маршруте в виде DTO
-     */
-    @GetMapping("/{id}")
-    @Operation(summary = "Получить маршрут по ID", description = "Возвращает маршрут по указанному идентификатору")
-    public ResponseEntity<RouteDetailDto> getRouteById(
-            @Parameter(description = "Идентификатор маршрута") @PathVariable Long id) {
-        // Используем метод, возвращающий DTO с детальной информацией
-        return ResponseEntity.ok(routeService.findDetailById(id));
-    }
-
-    /**
      * Расчет маршрута на основе запроса.
-     *
-     * @param request запрос на расчет маршрута
-     * @return рассчитанный маршрут с дополнительной информацией
+     * ВАЖНО: Этот метод должен быть объявлен ДО getRouteById
      */
     @PostMapping("/calculate")
     @Operation(summary = "Рассчитать маршрут",
@@ -128,7 +105,12 @@ public class RouteController {
         calculatedRoute = riskAnalysisService.analyzeRouteRisks(calculatedRoute, vehicle, cargo);
 
         // Рассчитываем экономические показатели
-        calculatedRoute = profitabilityService.calculateEconomics(calculatedRoute, vehicle, driver);
+        try {
+            calculatedRoute = profitabilityService.calculateEconomics(calculatedRoute, vehicle, driver);
+        } catch (Exception e) {
+            log.warn("Ошибка при расчете экономических показателей: {}", e.getMessage());
+            // Продолжаем без экономических данных
+        }
 
         // Проверяем соответствие РТО, если указан водитель
         if (driver != null) {
@@ -141,113 +123,8 @@ public class RouteController {
     }
 
     /**
-     * Создание нового маршрута.
-     *
-     * @param routeDto данные нового маршрута
-     * @return созданный маршрут в виде DTO
+     * Планирование маршрута по координатам - специфичный путь
      */
-    @PostMapping
-    @Operation(summary = "Создать маршрут", description = "Создает новый маршрут на основе переданных данных")
-    public ResponseEntity<RouteDetailDto> createRoute(
-            @Parameter(description = "Данные маршрута")
-            @Valid @RequestBody RouteCreateUpdateDto routeDto) {
-        return ResponseEntity.ok(routeService.createRoute(routeDto));
-    }
-
-    /**
-     * Новый эндпоинт для получения прогноза погоды для маршрута
-     */
-    @PostMapping("/weather-forecast")
-    @Operation(summary = "Получить прогноз погоды для маршрута",
-            description = "Анализирует погодные условия вдоль маршрута с учетом времени движения")
-    public ResponseEntity<RouteWeatherForecastDto> getRouteWeatherForecast(
-            @RequestBody RouteResponseDto route,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime departureTime) {
-
-        // Если время отправления не указано, используем текущее время + 1 час
-        if (departureTime == null) {
-            departureTime = LocalDateTime.now().plusHours(1);
-        }
-
-        try {
-            RouteWeatherForecastDto forecast =
-                    routeWeatherService.generateRouteWeatherForecast(route, departureTime);
-
-            if (forecast == null) {
-                return ResponseEntity.badRequest().build();
-            }
-
-            return ResponseEntity.ok(forecast);
-        } catch (Exception e) {
-            log.error("Ошибка при получении прогноза погоды для маршрута: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Новый эндпоинт для получения погодных предупреждений на маршруте
-     */
-    @PostMapping("/weather-hazards")
-    @Operation(summary = "Получить предупреждения о погодных опасностях на маршруте",
-            description = "Возвращает список предупреждений о погодных опасностях с рекомендациями")
-    public ResponseEntity<List<WeatherHazardWarningDto>> getWeatherHazards(
-            @RequestBody RouteResponseDto route,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime departureTime) {
-
-        // Если время отправления не указано, используем текущее время + 1 час
-        if (departureTime == null) {
-            departureTime = LocalDateTime.now().plusHours(1);
-        }
-
-        try {
-            RouteWeatherForecastDto forecast =
-                    routeWeatherService.generateRouteWeatherForecast(route, departureTime);
-
-            if (forecast == null) {
-                return ResponseEntity.badRequest().build();
-            }
-
-            return ResponseEntity.ok(forecast.getHazardWarnings());
-        } catch (Exception e) {
-            log.error("Ошибка при получении погодных предупреждений для маршрута: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Обновление маршрута.
-     *
-     * @param id идентификатор маршрута
-     * @param routeDto обновленные данные маршрута
-     * @return обновленный маршрут в виде DTO
-     */
-    @PutMapping("/{id}")
-    @Operation(summary = "Обновить маршрут", description = "Обновляет существующий маршрут")
-    public ResponseEntity<RouteDetailDto> updateRoute(
-            @Parameter(description = "Идентификатор маршрута") @PathVariable Long id,
-            @Parameter(description = "Обновленные данные маршрута")
-            @Valid @RequestBody RouteCreateUpdateDto routeDto) {
-
-        return ResponseEntity.ok(routeService.updateRoute(id, routeDto));
-    }
-
-    /**
-     * Удаление маршрута.
-     *
-     * @param id идентификатор маршрута
-     * @return результат операции
-     */
-    @DeleteMapping("/{id}")
-    @Operation(summary = "Удалить маршрут", description = "Удаляет маршрут по указанному идентификатору")
-    public ResponseEntity<Void> deleteRoute(
-            @Parameter(description = "Идентификатор маршрута") @PathVariable Long id) {
-
-        routeService.deleteById(id);
-        return ResponseEntity.noContent().build();
-    }
-
     @GetMapping("/plan")
     @Operation(summary = "Спланировать маршрут по координатам",
             description = "Рассчитывает маршрут между двумя точками с учетом параметров ТС")
@@ -270,8 +147,8 @@ public class RouteController {
                     .startLon(fromLon)
                     .endLat(toLat)
                     .endLon(toLon)
-                    .startAddress("Начальная точка")  // Добавляем для логов
-                    .endAddress("Конечная точка")     // Добавляем для логов
+                    .startAddress("Начальная точка")
+                    .endAddress("Конечная точка")
                     .build();
 
             // Создаем временный объект Vehicle с параметрами, соответствующими типу ТС
@@ -296,6 +173,9 @@ public class RouteController {
         }
     }
 
+    /**
+     * Планирование маршрута по названиям - специфичный путь
+     */
     @GetMapping("/plan-by-name")
     @Operation(summary = "Спланировать маршрут по названиям мест",
             description = "Рассчитывает маршрут между двумя населенными пунктами с учетом параметров ТС")
@@ -354,13 +234,7 @@ public class RouteController {
     }
 
     /**
-     * Поиск места для начальной или конечной точки маршрута.
-     *
-     * @param query Поисковый запрос
-     * @param placeType Тип места для более точного поиска
-     * @param lat Опорная широта (текущее местоположение)
-     * @param lon Опорная долгота (текущее местоположение)
-     * @return Список найденных мест
+     * Поиск места для начальной или конечной точки маршрута - специфичный путь
      */
     @GetMapping("/find-place")
     @Operation(summary = "Поиск места",
@@ -399,6 +273,51 @@ public class RouteController {
 
         List<GeoLocationDto> places = geocodingService.searchPlaces(query, osmTag, 10, lat, lon);
         return ResponseEntity.ok(places);
+    }
+
+    /**
+     * Создание нового маршрута.
+     */
+    @PostMapping
+    @Operation(summary = "Создать маршрут", description = "Создает новый маршрут на основе переданных данных")
+    public ResponseEntity<RouteDetailDto> createRoute(
+            @Parameter(description = "Данные маршрута")
+            @Valid @RequestBody RouteCreateUpdateDto routeDto) {
+        return ResponseEntity.ok(routeService.createRoute(routeDto));
+    }
+
+    /**
+     * Получение маршрута по ID.
+     * ВАЖНО: Этот метод должен быть объявлен ПОСЛЕ всех специфичных путей
+     */
+    @GetMapping("/{id:\\d+}")  // Регекс ограничивает только числовыми ID
+    @Operation(summary = "Получить маршрут по ID", description = "Возвращает маршрут по указанному идентификатору")
+    public ResponseEntity<RouteDetailDto> getRouteById(
+            @Parameter(description = "Идентификатор маршрута") @PathVariable Long id) {
+        return ResponseEntity.ok(routeService.findDetailById(id));
+    }
+
+    /**
+     * Обновление маршрута.
+     */
+    @PutMapping("/{id:\\d+}")  // Регекс для числовых ID
+    @Operation(summary = "Обновить маршрут", description = "Обновляет существующий маршрут")
+    public ResponseEntity<RouteDetailDto> updateRoute(
+            @Parameter(description = "Идентификатор маршрута") @PathVariable Long id,
+            @Parameter(description = "Обновленные данные маршрута")
+            @Valid @RequestBody RouteCreateUpdateDto routeDto) {
+        return ResponseEntity.ok(routeService.updateRoute(id, routeDto));
+    }
+
+    /**
+     * Удаление маршрута.
+     */
+    @DeleteMapping("/{id:\\d+}")  // Регекс для числовых ID
+    @Operation(summary = "Удалить маршрут", description = "Удаляет маршрут по указанному идентификатору")
+    public ResponseEntity<Void> deleteRoute(
+            @Parameter(description = "Идентификатор маршрута") @PathVariable Long id) {
+        routeService.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
     /**

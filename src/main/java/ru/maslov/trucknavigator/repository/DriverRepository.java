@@ -1,4 +1,5 @@
 package ru.maslov.trucknavigator.repository;
+import ru.maslov.trucknavigator.entity.DrivingStatus;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -55,7 +56,7 @@ public interface DriverRepository extends JpaRepository<Driver, Long> {
      * @param status статус вождения
      * @return список водителей
      */
-    List<Driver> findByCurrentDrivingStatus(Driver.DrivingStatus status);
+    List<Driver> findByCurrentDrivingStatus(DrivingStatus status);
 
     /**
      * Находит водителей, у которых заканчивается время непрерывного вождения.

@@ -1,4 +1,5 @@
 package ru.maslov.trucknavigator.controller;
+import ru.maslov.trucknavigator.entity.DrivingStatus;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,6 +16,7 @@ import ru.maslov.trucknavigator.dto.driver.DriverMedicalDto;
 import ru.maslov.trucknavigator.dto.driver.DriverPerformanceDto;
 import ru.maslov.trucknavigator.dto.driver.DriverSummaryDto;
 import ru.maslov.trucknavigator.entity.Driver;
+import ru.maslov.trucknavigator.entity.DrivingStatus;
 import ru.maslov.trucknavigator.entity.Route;
 import ru.maslov.trucknavigator.exception.EntityNotFoundException;
 import ru.maslov.trucknavigator.service.DriverService;
@@ -65,10 +67,15 @@ public class DriverController {
     public ResponseEntity<DriverDetailDto> updateDriver(
             @PathVariable Long id, @Valid @RequestBody Driver driver) {
 
-        if (!driverService.existsById(id)) {
+        // Проверяем существование водителя
+        Driver existingDriver = driverService.findById(id)
+                .orElse(null);
+        
+        if (existingDriver == null) {
             return ResponseEntity.notFound().build();
         }
 
+        // Устанавливаем ID для обновления
         driver.setId(id);
         return ResponseEntity.ok(driverService.saveAndGetDto(driver));
     }
@@ -108,7 +115,7 @@ public class DriverController {
     @PreAuthorize("hasAnyRole('DRIVER', 'DISPATCHER', 'MANAGER', 'ADMIN')")
     public ResponseEntity<DriverDetailDto> updateDriverStatus(
             @PathVariable Long driverId,
-            @RequestParam Driver.DrivingStatus status,
+            @RequestParam DrivingStatus status,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime timestamp) {
 
         return ResponseEntity.ok(driverService.updateDriverStatus(driverId, status, timestamp));

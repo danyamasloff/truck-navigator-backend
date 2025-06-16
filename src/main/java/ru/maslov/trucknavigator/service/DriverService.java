@@ -1,4 +1,5 @@
 package ru.maslov.trucknavigator.service;
+import ru.maslov.trucknavigator.entity.DrivingStatus;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -8,6 +9,7 @@ import ru.maslov.trucknavigator.dto.driver.DriverMedicalDto;
 import ru.maslov.trucknavigator.dto.driver.DriverQualificationDto;
 import ru.maslov.trucknavigator.dto.driver.DriverSummaryDto;
 import ru.maslov.trucknavigator.entity.Driver;
+import ru.maslov.trucknavigator.entity.DrivingStatus;
 import ru.maslov.trucknavigator.exception.EntityNotFoundException;
 import ru.maslov.trucknavigator.mapper.DriverMapper;
 import ru.maslov.trucknavigator.repository.DriverRepository;
@@ -16,6 +18,11 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Сервис для работы с водителями.
+ * Содержит бизнес-логику для управления данными водителей,
+ * включая режим труда и отдыха (РТО), медицинские данные и квалификации.
+ */
 @Service
 @RequiredArgsConstructor
 public class DriverService {
@@ -244,7 +251,7 @@ public class DriverService {
      * @return обновленный водитель в виде детального DTO
      */
     @Transactional
-    public DriverDetailDto updateDriverStatus(Long driverId, Driver.DrivingStatus status, LocalDateTime timestamp) {
+    public DriverDetailDto updateDriverStatus(Long driverId, DrivingStatus status, LocalDateTime timestamp) {
         Driver driver = driverRepository.findById(driverId)
                 .orElseThrow(() -> new EntityNotFoundException("Driver", driverId));
 
@@ -283,8 +290,8 @@ public class DriverService {
         );
     }
 
-    private void updateDrivingCounters(Driver driver, Driver.DrivingStatus newStatus) {
-        Driver.DrivingStatus oldStatus = driver.getCurrentDrivingStatus();
+    private void updateDrivingCounters(Driver driver, DrivingStatus newStatus) {
+        DrivingStatus oldStatus = driver.getCurrentDrivingStatus();
 
         // Рассчитать время в предыдущем статусе
         if (oldStatus != null && driver.getCurrentStatusStartTime() != null) {
@@ -294,7 +301,7 @@ public class DriverService {
             ).toMinutes();
 
             // Обновляем счетчики в зависимости от предыдущего статуса
-            if (Driver.DrivingStatus.DRIVING.equals(oldStatus)) {
+            if (DrivingStatus.DRIVING.equals(oldStatus)) {
                 // Увеличиваем счетчики времени вождения
                 updateDrivingTimeCounters(driver, minutesInPreviousStatus);
             }
@@ -326,24 +333,23 @@ public class DriverService {
         );
     }
 
-    private boolean isRestStatus(Driver.DrivingStatus status) {
-        return Driver.DrivingStatus.REST_BREAK.equals(status) ||
-                Driver.DrivingStatus.DAILY_REST.equals(status) ||
-                Driver.DrivingStatus.WEEKLY_REST.equals(status);
+    private boolean isRestStatus(DrivingStatus status) {
+        return DrivingStatus.REST_BREAK.equals(status) ||
+                DrivingStatus.DAILY_REST.equals(status) ||
+                DrivingStatus.WEEKLY_REST.equals(status);
     }
 
-    private void resetCountersBasedOnRestType(Driver driver, Driver.DrivingStatus restStatus) {
+    private void resetCountersBasedOnRestType(Driver driver, DrivingStatus restStatus) {
         // Сброс счетчика непрерывного вождения при любом отдыхе
         driver.setContinuousDrivingMinutes(0);
 
         // Сброс суточного счетчика при дневном или недельном отдыхе
-        if (Driver.DrivingStatus.DAILY_REST.equals(restStatus) ||
-                Driver.DrivingStatus.WEEKLY_REST.equals(restStatus)) {
+        if (DrivingStatus.DAILY_REST.equals(restStatus)) {
             driver.setDailyDrivingMinutesToday(0);
         }
 
         // Сброс недельного счетчика при недельном отдыхе
-        if (Driver.DrivingStatus.WEEKLY_REST.equals(restStatus)) {
+        if (DrivingStatus.WEEKLY_REST.equals(restStatus)) {
             driver.setWeeklyDrivingMinutes(0);
         }
     }

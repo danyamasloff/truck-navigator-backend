@@ -1,4 +1,5 @@
 package ru.maslov.trucknavigator.service;
+import ru.maslov.trucknavigator.entity.DrivingStatus;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,7 +53,7 @@ public class ComplianceService {
         }
 
         // Текущее состояние водителя
-        Driver.DrivingStatus currentStatus = driver.getCurrentDrivingStatus();
+        DrivingStatus currentStatus = driver.getCurrentDrivingStatus();
         LocalDateTime statusStartTime = driver.getCurrentStatusStartTime();
         Integer continuousDrivingMinutes = driver.getContinuousDrivingMinutes();
         Integer dailyDrivingMinutesToday = driver.getDailyDrivingMinutesToday();
@@ -96,13 +97,13 @@ public class ComplianceService {
 
         // Если водитель находится не в режиме вождения, проверяем минимальное время отдыха
         if (currentStatus != null && statusStartTime != null &&
-                (currentStatus == Driver.DrivingStatus.REST_BREAK ||
-                        currentStatus == Driver.DrivingStatus.DAILY_REST)) {
+                (currentStatus == DrivingStatus.REST_BREAK ||
+                        currentStatus == DrivingStatus.DAILY_REST)) {
 
             Duration restDuration = Duration.between(statusStartTime, LocalDateTime.now());
             long restMinutes = restDuration.toMinutes();
 
-            if (currentStatus == Driver.DrivingStatus.REST_BREAK &&
+            if (currentStatus == DrivingStatus.REST_BREAK &&
                     restMinutes < longBreakMinutes &&
                     continuousDrivingMinutes >= maxContinuousDrivingMinutes) {
 

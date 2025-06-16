@@ -8,6 +8,7 @@ import ru.maslov.trucknavigator.dto.routing.RouteResponseDto;
 import ru.maslov.trucknavigator.entity.Driver;
 import ru.maslov.trucknavigator.entity.Route;
 import ru.maslov.trucknavigator.entity.Vehicle;
+import ru.maslov.trucknavigator.integration.fuelprice.FuelPriceService;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -24,6 +25,8 @@ import java.util.Random;
 @RequiredArgsConstructor
 @Slf4j
 public class ProfitabilityService {
+
+    private final FuelPriceService fuelPriceService;
 
     // Весовые коэффициенты для расчета стоимости, настраиваются в конфигурации
     @Value("${profitability.fuel.cost.weight:0.5}")
@@ -201,10 +204,26 @@ public class ProfitabilityService {
      * @return цена за литр топлива
      */
     private BigDecimal getFuelPrice(RouteResponseDto route) {
-        // Заглушка: в реальном приложении здесь будет обращение к API цен на топливо
-        // или расчет средней цены по маршруту на основе данных из БД
+        try {
+            // Пытаемся получить реальную цену топлива
+            if (route.getCoordinates() != null && !route.getCoordinates().isEmpty()) {
+                // Берем среднюю точку маршрута для запроса цены
+                int midIndex = route.getCoordinates().size() / 2;
+                double[] midPoint = route.getCoordinates().get(midIndex);
+                double lat = midPoint[1]; // [lon, lat]
+                double lon = midPoint[0];
+                
+                var fuelPriceDto = fuelPriceService.getFuelPrice(lat, lon, "DIESEL");
+                if (fuelPriceDto != null && fuelPriceDto.getPrice() != null) {
+                    log.debug("Получена цена топлива: {} {}", fuelPriceDto.getPrice(), fuelPriceDto.getCurrency());
+                    return fuelPriceDto.getPrice();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Не удалось получить цену топлива из API, используем значение по умолчанию: {}", e.getMessage());
+        }
 
-        // Берем базовую цену и добавляем случайное отклонение +/- 10%
+        // Заглушка: в случае ошибки используем базовую цену с небольшой вариацией
         Random random = new Random();
         double variation = (random.nextDouble() * 0.2) - 0.1; // от -0.1 до 0.1
 

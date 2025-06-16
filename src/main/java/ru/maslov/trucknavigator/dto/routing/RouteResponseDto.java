@@ -27,6 +27,7 @@ public class RouteResponseDto {
     private long duration;        // в минутах
 
     // Геометрия маршрута
+    @Builder.Default
     private List<double[]> coordinates = new ArrayList<>();
 
     // Используем JsonIgnore, чтобы исключить поле из сериализации JSON
@@ -34,6 +35,7 @@ public class RouteResponseDto {
     private LineString<G2D> geometry;
 
     // Список инструкций
+    @Builder.Default
     private List<Instruction> instructions = new ArrayList<>();
 
     // Время отправления
@@ -52,12 +54,16 @@ public class RouteResponseDto {
     private BigDecimal estimatedDriverCost;
     private BigDecimal estimatedTotalCost;
 
+    @Builder.Default
     private List<RoadQualitySegment> roadQualitySegments = new ArrayList<>();
+    @Builder.Default
     private List<WeatherAlertSegment> weatherAlertSegments = new ArrayList<>();
+    @Builder.Default
     private List<TollSegment> tollSegments = new ArrayList<>();
 
     //Комплаенс-Ассистент РТО
     private boolean rtoCompliant;
+    @Builder.Default
     private List<String> rtoWarnings = new ArrayList<>();
 
     /**
@@ -66,6 +72,7 @@ public class RouteResponseDto {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @Builder
     public static class Instruction {
         private String text;
         private BigDecimal distance;  // в километрах
@@ -79,6 +86,7 @@ public class RouteResponseDto {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @Builder
     public static class RoadQualitySegment {
         private int startIndex;       // индекс начальной точки в массиве координат
         private int endIndex;         // индекс конечной точки в массиве координат
@@ -92,6 +100,7 @@ public class RouteResponseDto {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @Builder
     public static class WeatherAlertSegment {
         private int startIndex;       // индекс начальной точки в массиве координат
         private int endIndex;         // индекс конечной точки в массиве координат
@@ -105,6 +114,7 @@ public class RouteResponseDto {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @Builder
     public static class TollSegment {
         private int startIndex;       // индекс начальной точки в массиве координат
         private int endIndex;         // индекс конечной точки в массиве координат

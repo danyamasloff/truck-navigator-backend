@@ -1,4 +1,5 @@
 package ru.maslov.trucknavigator.dto.driver;
+import ru.maslov.trucknavigator.entity.DrivingStatus;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -43,7 +44,7 @@ public class DriverDetailDto {
     private BigDecimal perKilometerRate;
 
     // Текущий статус РТО
-    private Driver.DrivingStatus currentDrivingStatus;
+    private DrivingStatus currentDrivingStatus;
     private LocalDateTime currentStatusStartTime;
     private Integer dailyDrivingMinutesToday;
     private Integer continuousDrivingMinutes;
@@ -57,7 +58,7 @@ public class DriverDetailDto {
      * Проверяет, действителен ли статус водителя для рейса
      */
     public boolean isAvailableForDriving() {
-        return currentDrivingStatus == Driver.DrivingStatus.AVAILABILITY ||
+        return currentDrivingStatus == DrivingStatus.AVAILABILITY ||
                 currentDrivingStatus == null;
     }
 

@@ -1,4 +1,3 @@
-// DriverQualificationDto.java
 package ru.maslov.trucknavigator.dto.driver;
 
 import lombok.AllArgsConstructor;
@@ -18,4 +17,4 @@ public class DriverQualificationDto {
     private boolean hasDangerousGoodsCertificate;
     private LocalDate dangerousGoodsExpiryDate;
     private boolean hasInternationalPermit;
-}
+} 

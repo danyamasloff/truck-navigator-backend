@@ -39,6 +39,7 @@ public class SecurityConfig {
     private final UserDetailsService userDetailsService;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * Настраивает цепочку фильтров безопасности.
@@ -61,33 +62,33 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**").permitAll()
                         .requestMatchers("/swagger-ui.html").permitAll()
 
-                        // Эндпоинты для получения данных доступны всем аутентифицированным пользователям
+                        // GET эндпоинты для разработки - убираем аутентификацию
                         .requestMatchers(HttpMethod.GET, "/api/routes/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/vehicles/**").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/drivers/**").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/cargos/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/vehicles/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/drivers/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/cargos/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/geocoding/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/weather/**").permitAll()
 
-                        // Эндпоинты для модификации данных доступны только администраторам и диспетчерам
-                        .requestMatchers(HttpMethod.POST, "/api/**").hasAnyRole("ADMIN", "DISPATCHER")
+                        // POST эндпоинты для расчетов - публичные для разработки
+                        .requestMatchers("/api/routes/calculate").permitAll()
+                        .requestMatchers("/api/routes/plan").permitAll()
+                        .requestMatchers("/api/routes/plan-by-name").permitAll()
+
+                        // Эндпоинты для модификации данных - требуют аутентификации
+                        .requestMatchers(HttpMethod.POST, "/api/vehicles/**").hasAnyRole("ADMIN", "DISPATCHER")
+                        .requestMatchers(HttpMethod.POST, "/api/drivers/**").hasAnyRole("ADMIN", "DISPATCHER")
+                        .requestMatchers(HttpMethod.POST, "/api/cargos/**").hasAnyRole("ADMIN", "DISPATCHER")
+                        .requestMatchers(HttpMethod.POST, "/api/routes/**").hasAnyRole("ADMIN", "DISPATCHER")
+
                         .requestMatchers(HttpMethod.PUT, "/api/**").hasAnyRole("ADMIN", "DISPATCHER")
                         .requestMatchers(HttpMethod.DELETE, "/api/**").hasAnyRole("ADMIN")
 
-                        // Эндпоинты для получения данных - доступны всем аутентифицированным пользователям
-                        .requestMatchers("/api/routes/calculate").authenticated()
-                        .requestMatchers("/api/cargos/**").authenticated()
-                        .requestMatchers("/api/vehicles/**").authenticated()
-                        .requestMatchers("/api/drivers/**").authenticated()
-
-                        // Эндпоинты для расчета маршрутов доступны всем аутентифицированным пользователям
-                        .requestMatchers("/api/routes/calculate").authenticated()
-
-                        // Остальные запросы требуют аутентификации и проверяются через @PreAuthorize
+                        // Остальные запросы требуют аутентификации
                         .anyRequest().authenticated()
                 );
 
-        // Добавляем фильтр JWT перед стандартным фильтром аутентификации
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
 
@@ -98,7 +99,7 @@ public class SecurityConfig {
     public DaoAuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
         authProvider.setUserDetailsService(userDetailsService);
-        authProvider.setPasswordEncoder(passwordEncoder());
+        authProvider.setPasswordEncoder(passwordEncoder);
         return authProvider;
     }
 
@@ -110,13 +111,7 @@ public class SecurityConfig {
         return authConfig.getAuthenticationManager();
     }
 
-    /**
-     * Настраивает кодировщик паролей.
-     */
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+
 
     /**
      * Настраивает CORS (Cross-Origin Resource Sharing).
@@ -128,7 +123,8 @@ public class SecurityConfig {
         // Разрешенные источники запросов
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",      // Dev React
-                "http://localhost:5173",      // Dev Vite (если используете стандартный порт Vite)
+                "http://localhost:5173",      // Dev Vite
+                "http://localhost:4173",      // Vite preview
                 "https://truck-navigator.ru"  // Production
         ));
 

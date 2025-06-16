@@ -31,13 +31,17 @@ public class RouteRequestDto {
     private String endAddress;
 
     // Промежуточные точки (waypoints)
+    @Builder.Default
     private List<WaypointDto> waypoints = new ArrayList<>();
 
     // GraphHopper API параметры
     private String profile;
-    private boolean calcPoints;
-    private boolean instructions;
-    private boolean pointsEncoded;
+    @Builder.Default
+    private boolean calcPoints = true;
+    @Builder.Default
+    private boolean instructions = true;
+    @Builder.Default
+    private boolean pointsEncoded = false;
 
     // Идентификаторы связанных сущностей
     private Long vehicleId;
@@ -48,11 +52,16 @@ public class RouteRequestDto {
     private LocalDateTime departureTime;
 
     // Дополнительные параметры
-    private boolean avoidTolls;
-    private boolean avoidHighways;
-    private boolean avoidUrbanAreas;
-    private boolean considerWeather;
-    private boolean considerTraffic;
+    @Builder.Default
+    private boolean avoidTolls = false;
+    @Builder.Default
+    private boolean avoidHighways = false;
+    @Builder.Default
+    private boolean avoidUrbanAreas = false;
+    @Builder.Default
+    private boolean considerWeather = true;
+    @Builder.Default
+    private boolean considerTraffic = false;
 
     /**
      * DTO для промежуточной точки в запросе маршрута.
@@ -60,13 +69,16 @@ public class RouteRequestDto {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @Builder
     public static class WaypointDto {
         private double latitude;
         private double longitude;
         private String address;
         private String name;
         private String waypointType;
-        private boolean stopover;
-        private int stopDuration;
+        @Builder.Default
+        private boolean stopover = true;
+        @Builder.Default
+        private int stopDuration = 0; // в минутах
     }
 }

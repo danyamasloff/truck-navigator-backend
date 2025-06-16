@@ -1,4 +1,5 @@
 package ru.maslov.trucknavigator.mapper;
+import ru.maslov.trucknavigator.entity.DrivingStatus;
 
 import org.springframework.stereotype.Component;
 import ru.maslov.trucknavigator.dto.driver.DriverDetailDto;

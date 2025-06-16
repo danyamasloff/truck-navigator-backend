@@ -1,4 +1,5 @@
 package ru.maslov.trucknavigator.dto.driver;
+import ru.maslov.trucknavigator.entity.DrivingStatus;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,7 +25,7 @@ public class DriverSummaryDto {
     private String licenseNumber;
     private String phoneNumber;
     private Integer drivingExperienceYears;
-    private Driver.DrivingStatus currentDrivingStatus;
+    private DrivingStatus currentDrivingStatus;
 
     /**
      * Возвращает полное имя водителя
@@ -40,7 +41,7 @@ public class DriverSummaryDto {
      * Проверяет, действителен ли статус водителя для рейса
      */
     public boolean isAvailableForDriving() {
-        return currentDrivingStatus == Driver.DrivingStatus.AVAILABILITY ||
+        return currentDrivingStatus == DrivingStatus.AVAILABILITY ||
                 currentDrivingStatus == null;
     }
 }

@@ -1,4 +1,5 @@
 package ru.maslov.trucknavigator.dto.driver;
+import ru.maslov.trucknavigator.entity.DrivingStatus;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,7 +29,7 @@ public class DriverRestAnalysisDto {
     private int estimatedTripDurationMinutes;
 
     // Текущий статус водителя
-    private Driver.DrivingStatus currentDrivingStatus;
+    private DrivingStatus currentDrivingStatus;
     private LocalDateTime currentStatusStartTime;
 
     // Оставшееся время вождения
