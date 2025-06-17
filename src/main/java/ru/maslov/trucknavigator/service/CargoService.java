@@ -22,6 +22,7 @@ public class CargoService {
 
     private final CargoRepository cargoRepository;
     private final CargoMapper cargoMapper;
+    private final NotificationService notificationService;
 
     /**
      * Получает все грузы в виде сокращенных DTO.
@@ -74,7 +75,17 @@ public class CargoService {
      */
     @Transactional
     public CargoDetailDto saveAndGetDto(Cargo cargo) {
+        boolean isNewCargo = cargo.getId() == null;
         Cargo savedCargo = cargoRepository.save(cargo);
+        
+        if (isNewCargo) {
+            // Создаем уведомление о создании нового груза
+            notificationService.notifyCargoCreated(savedCargo.getId(), savedCargo.getName());
+        } else {
+            // Создаем уведомление об обновлении груза
+            notificationService.notifyCargoUpdated(savedCargo.getId(), savedCargo.getName());
+        }
+        
         return cargoMapper.toDetailDto(savedCargo);
     }
 

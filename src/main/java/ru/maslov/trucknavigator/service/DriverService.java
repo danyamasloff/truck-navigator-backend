@@ -29,6 +29,7 @@ public class DriverService {
 
     private final DriverRepository driverRepository;
     private final DriverMapper driverMapper;
+    private final NotificationService notificationService;
 
     /**
      * Получает список всех водителей в виде сокращенных DTO.
@@ -38,6 +39,15 @@ public class DriverService {
     public List<DriverSummaryDto> findAllSummaries() {
         List<Driver> drivers = driverRepository.findAll();
         return driverMapper.toSummaryDtoList(drivers);
+    }
+
+    /**
+     * Получает список всех водителей.
+     *
+     * @return список водителей
+     */
+    public List<Driver> findAll() {
+        return driverRepository.findAll();
     }
 
     /**
@@ -61,7 +71,19 @@ public class DriverService {
      */
     @Transactional
     public DriverDetailDto saveAndGetDto(Driver driver) {
+        boolean isNewDriver = driver.getId() == null;
         Driver savedDriver = driverRepository.save(driver);
+        
+        String driverName = savedDriver.getFirstName() + " " + savedDriver.getLastName();
+        
+        if (isNewDriver) {
+            // Создаем уведомление о создании нового водителя
+            notificationService.notifyDriverCreated(savedDriver.getId(), driverName);
+        } else {
+            // Создаем уведомление об обновлении водителя
+            notificationService.notifyDriverUpdated(savedDriver.getId(), driverName);
+        }
+        
         return driverMapper.toDetailDto(savedDriver);
     }
 

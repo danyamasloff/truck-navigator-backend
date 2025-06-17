@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,6 +63,13 @@ public class RouteRequestDto {
     private boolean considerWeather = true;
     @Builder.Default
     private boolean considerTraffic = false;
+
+    // Поля риска (автоматически заполняются случайными значениями от 0 до 100)
+    private BigDecimal overallRiskScore;
+    private BigDecimal weatherRiskScore;
+    private BigDecimal roadQualityRiskScore;
+    private BigDecimal trafficRiskScore;
+    private BigDecimal cargoRiskScore;
 
     /**
      * DTO для промежуточной точки в запросе маршрута.

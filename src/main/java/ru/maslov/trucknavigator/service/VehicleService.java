@@ -23,6 +23,7 @@ public class VehicleService {
 
     private final VehicleRepository vehicleRepository;
     private final VehicleMapper vehicleMapper;
+    private final NotificationService notificationService;
 
     /**
      * Получает все транспортные средства в виде сокращенных DTO.
@@ -75,7 +76,17 @@ public class VehicleService {
      */
     @Transactional
     public VehicleDetailDto saveAndGetDto(Vehicle vehicle) {
+        boolean isNewVehicle = vehicle.getId() == null;
         Vehicle savedVehicle = vehicleRepository.save(vehicle);
+        
+        if (isNewVehicle) {
+            // Создаем уведомление о создании нового ТС
+            notificationService.notifyVehicleCreated(savedVehicle.getId(), savedVehicle.getRegistrationNumber());
+        } else {
+            // Создаем уведомление об обновлении ТС
+            notificationService.notifyVehicleUpdated(savedVehicle.getId(), savedVehicle.getRegistrationNumber());
+        }
+        
         return vehicleMapper.toDetailDto(savedVehicle);
     }
 

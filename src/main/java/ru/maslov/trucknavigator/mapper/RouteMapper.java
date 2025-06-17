@@ -129,11 +129,13 @@ public class RouteMapper {
 
         Route route = existingRoute != null ? existingRoute : new Route();
 
+        // Основные поля
         route.setName(dto.getName());
         route.setVehicle(vehicle);
         route.setDriver(driver);
         route.setCargo(cargo);
 
+        // Координаты и адреса
         route.setStartAddress(dto.getStartAddress());
         route.setStartLat(dto.getStartLat());
         route.setStartLon(dto.getStartLon());
@@ -141,17 +143,74 @@ public class RouteMapper {
         route.setEndLat(dto.getEndLat());
         route.setEndLon(dto.getEndLon());
 
+        // Время
         route.setDepartureTime(dto.getDepartureTime());
+        if (dto.getEstimatedArrivalTime() != null) {
+            route.setEstimatedArrivalTime(dto.getEstimatedArrivalTime());
+        }
+        if (dto.getActualArrivalTime() != null) {
+            route.setActualArrivalTime(dto.getActualArrivalTime());
+        }
 
-        // Добавляем значения по умолчанию для обязательных полей
-        if (existingRoute == null || route.getDistanceKm() == null) {
+        // Параметры маршрута
+        if (dto.getDistanceKm() != null) {
+            route.setDistanceKm(dto.getDistanceKm());
+        } else if (existingRoute == null) {
             route.setDistanceKm(BigDecimal.ZERO); // Значение по умолчанию для нового маршрута
         }
 
-        if (existingRoute == null || route.getEstimatedDurationMinutes() == null) {
+        if (dto.getEstimatedDurationMinutes() != null) {
+            route.setEstimatedDurationMinutes(dto.getEstimatedDurationMinutes());
+        } else if (existingRoute == null) {
             route.setEstimatedDurationMinutes(0); // Значение по умолчанию
         }
 
+        // Расход топлива
+        if (dto.getEstimatedFuelConsumption() != null) {
+            route.setEstimatedFuelConsumption(dto.getEstimatedFuelConsumption());
+        }
+        if (dto.getActualFuelConsumption() != null) {
+            route.setActualFuelConsumption(dto.getActualFuelConsumption());
+        }
+
+        // Экономические показатели
+        if (dto.getEstimatedFuelCost() != null) {
+            route.setEstimatedFuelCost(dto.getEstimatedFuelCost());
+        }
+        if (dto.getEstimatedTollCost() != null) {
+            route.setEstimatedTollCost(dto.getEstimatedTollCost());
+        }
+        if (dto.getEstimatedDriverCost() != null) {
+            route.setEstimatedDriverCost(dto.getEstimatedDriverCost());
+        }
+        if (dto.getEstimatedTotalCost() != null) {
+            route.setEstimatedTotalCost(dto.getEstimatedTotalCost());
+        }
+        if (dto.getActualTotalCost() != null) {
+            route.setActualTotalCost(dto.getActualTotalCost());
+        }
+        if (dto.getCurrency() != null) {
+            route.setCurrency(dto.getCurrency());
+        }
+
+        // Анализ рисков
+        if (dto.getOverallRiskScore() != null) {
+            route.setOverallRiskScore(dto.getOverallRiskScore());
+        }
+        if (dto.getWeatherRiskScore() != null) {
+            route.setWeatherRiskScore(dto.getWeatherRiskScore());
+        }
+        if (dto.getRoadQualityRiskScore() != null) {
+            route.setRoadQualityRiskScore(dto.getRoadQualityRiskScore());
+        }
+        if (dto.getTrafficRiskScore() != null) {
+            route.setTrafficRiskScore(dto.getTrafficRiskScore());
+        }
+        if (dto.getCargoRiskScore() != null) {
+            route.setCargoRiskScore(dto.getCargoRiskScore());
+        }
+
+        // Статус
         if (dto.getStatus() != null) {
             route.setStatus(dto.getStatus());
         } else if (existingRoute == null) {
